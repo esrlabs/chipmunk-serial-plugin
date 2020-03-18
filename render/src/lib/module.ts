@@ -13,6 +13,18 @@ import { PrimitiveModule } from 'chipmunk-client-material';
 import { DialogAvailablePortComponent } from './views/dialog/port.available/components';
 import * as Toolkit from 'chipmunk.client.toolkit';
 
+export {
+    SidebarVerticalComponent,
+    SidebarVerticalPortInfoComponent,
+    SidebarVerticalPortConnectedComponent,
+    SidebarVerticalPortOptionsReadComponent,
+    SidebarVerticalPortOptionsWriteComponent,
+    SidebarVerticalPortDialogComponent,
+    SidebarTitleAddComponent,
+    SerialRowComponent,
+    DialogAvailablePortComponent
+};
+
 const CComponents = [
     SidebarVerticalComponent,
     SidebarVerticalPortInfoComponent,

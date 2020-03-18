@@ -147,7 +147,7 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit {
                 animation: {
                     duration: COptions.ANIMATION,
                 },
-                tooltips: false,
+                tooltips: undefined,
                 scales: {
                     xAxes: [{
                         ticks: {
