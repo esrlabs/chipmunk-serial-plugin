@@ -16,7 +16,7 @@
       "dom",
       "es2018"
     ],
-    "allowSyntheticDefaultImports": true,
+    "allowSyntheticDefaultImports": true
   },
   "angularCompilerOptions": {
     "annotateForClosureCompiler": true,

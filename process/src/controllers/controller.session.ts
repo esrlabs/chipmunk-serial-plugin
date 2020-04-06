@@ -103,10 +103,10 @@ export class ControllerSession {
                         onData: this._readSpyLoad.bind(this, option.path),
                         onError: this._onPortError.bind(this, option.path),
                         onDisconnect: this._onSpyPortDisconnect.bind(this, option.path)
-                    });
+                    }).then(() => this._logger.env('Starting spying on: ' + option.path));
                 }),
             ).then(() => {
-                this._logger.env(`Starting to spy`);
+                this._logger.env(`Spying has started for all ports`);
                 resolve();
             }).catch((openErr: Error) => {
                 reject(new Error(this._logger.error(`Failed to start spying on ports due to error: ${openErr.message}`)));
@@ -123,7 +123,9 @@ export class ControllerSession {
                         return reject(new Error(this._logger.error(`Port "${option.path}" isn't being spied on`)));
                     }
                     this._removePort(option.path);
-                    return ServicePorts.unrefPort(PSEUDO_SESSION, option.path).catch((error: Error) => {
+                    return ServicePorts.unrefPort(PSEUDO_SESSION, option.path).then(() => {
+                        this._logger.env('Stopping spying on: ' + option.path);
+                    }).catch((error: Error) => {
                         this._logger.error(`Failed to unref normally port "${option.path}" while spying due to error: ${error.message}`);
                     });
                 })

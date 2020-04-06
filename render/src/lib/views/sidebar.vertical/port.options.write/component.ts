@@ -1,9 +1,10 @@
 // tslint:disable:no-inferrable-types
 
-import { Component, OnDestroy, ChangeDetectorRef, AfterViewInit, AfterContentInit, Input, ViewChild } from '@angular/core';
+import { Component, OnDestroy, ChangeDetectorRef, AfterContentInit, Input, Output, EventEmitter } from '@angular/core';
 import { IOptions } from '../../../common/interface.options';
 import * as Toolkit from 'chipmunk.client.toolkit';
-import { CheckSimpleComponent, InputStandardComponent, DDListStandardComponent } from 'chipmunk-client-material';
+import { FormControl, Validators } from '@angular/forms';
+import { IPortOptions } from '../../../common/interface.options';
 
 @Component({
     selector: 'lib-sb-port-options-write-com',
@@ -11,41 +12,35 @@ import { CheckSimpleComponent, InputStandardComponent, DDListStandardComponent }
     styleUrls: ['./styles.less']
 })
 
-export class SidebarVerticalPortOptionsWriteComponent implements AfterViewInit, AfterContentInit, OnDestroy {
+export class SidebarVerticalPortOptionsWriteComponent implements AfterContentInit, OnDestroy {
 
-    @ViewChild('baudRateInputCom', {static: false}) _baudRateInputCom: InputStandardComponent;
-    @ViewChild('baudRateDDCom', {static: false}) _baudRateDDCom: DDListStandardComponent;
-    @ViewChild('lockCom', {static: false}) _lockCom: CheckSimpleComponent;
-    @ViewChild('dataBitsCom', {static: false}) _dataBitsCom: DDListStandardComponent;
-    @ViewChild('highWaterMarkCom', {static: false}) _highWaterMarkCom: InputStandardComponent;
-    @ViewChild('delimiterCom', {static: false}) _delimiterCom: InputStandardComponent;
-    @ViewChild('stopBitsCom', {static: false}) _stopBitsCom: DDListStandardComponent;
-    @ViewChild('parityCom', {static: false}) _parityCom: DDListStandardComponent;
-    @ViewChild('rtsctsCom', {static: false}) _rtsctsCom: CheckSimpleComponent;
-    @ViewChild('xonCom', {static: false}) _xonCom: CheckSimpleComponent;
-    @ViewChild('xoffCom', {static: false}) _xoffCom: CheckSimpleComponent;
-    @ViewChild('xanyCom', {static: false}) _xanyCom: CheckSimpleComponent;
-    @ViewChild('encodingCom', {static: false}) _encodingCom: DDListStandardComponent;
+    @Input() path: string;
+    @Input() options: IOptions;
 
-    @Input() public baudRate: number = 921600;
-    @Input() public lock: boolean = false;
-    @Input() public dataBits: number = 8;
-    @Input() public highWaterMark: number = 65536;
-    @Input() public stopBits: number = 1;
-    @Input() public parity: string = 'none';
-    @Input() public rtscts: boolean = false;
-    @Input() public xon: boolean = false;
-    @Input() public xoff: boolean = false;
-    @Input() public xany: boolean = false;
-    @Input() public delimiter: string = '\\n';
-    @Input() public encoding: string = 'utf8';
-    @Input() public includeDelimiter: boolean = false;
-    @Input() public path: string;
+    @Output() optionChange: EventEmitter<boolean> = new EventEmitter();
 
     private _subscriptions: { [key: string]: Toolkit.Subscription } = {};
     private _destroyed: boolean = false;
 
-    public _ng_baudrateListed: number;
+    public highWaterMark: number = 65536;
+    public lock: boolean = false;
+    public rtscts: boolean = false;
+    public xon: boolean = false;
+    public xoff: boolean = false;
+    public xany: boolean = false;
+    public baudRate: IPortOptions['baudRate'] = 921600;
+    public stopBits: IPortOptions['stopBits'] = 1;
+    public parity: IPortOptions['parity'] = 'none';
+    public dataBits: IPortOptions['dataBits'] = 8;
+    public encoding: IOptions['reader']['encoding'] = 'utf8';
+    public delimiter: IOptions['reader']['delimiter'] = '\\n';
+    public baudRatePlaceholder: string = this.baudRate.toString();
+    public custom: boolean = false;
+
+    public baudRateInput = new FormControl('', [
+        Validators.required,
+        Validators.pattern(/^[0-9]\d*$/),
+    ]);
     public _ng_baudrateItems: Array<{ caption: string, value: any, }> = [
         { caption: 'custom', value: -1 },
         { caption: '110', value: 110 },
@@ -90,65 +85,94 @@ export class SidebarVerticalPortOptionsWriteComponent implements AfterViewInit, 
     ];
 
     constructor(private _cdRef: ChangeDetectorRef) {
-        this._ng_onBaudRateDDChange = this._ng_onBaudRateDDChange.bind(this);
+        this._ng_onBRChange = this._ng_onBRChange.bind(this);
     }
 
     ngOnDestroy() {
+        this.optionChange.emit(false);
         this._destroyed = true;
         Object.keys(this._subscriptions).forEach((key: string) => {
             this._subscriptions[key].unsubscribe();
         });
     }
 
-    ngAfterViewInit() {
-        this._ng_baudrateListed = this.baudRate;
-        this._forceUpdate();
-    }
-
     ngAfterContentInit() {
-        this.delimiter = this.delimiter.replace(/\n/gi, '\\n').replace(/\r/gi, '\\r').replace(/\t/gi, '\\t');
+        if (this.options) {
+            this._setOptions(this.options);
+        }
+        if (typeof this.delimiter === 'string') {
+            this.delimiter = this.delimiter.replace(/\n/gi, '\\n').replace(/\r/gi, '\\r').replace(/\t/gi, '\\t');
+        }
     }
 
-    public _ng_onBaudRateDDChange(value: string | number) {
-        this._ng_baudrateListed = parseInt(value as string, 10);
+    public _ng_onBRChange() {
+        if (this.baudRate === -1) {
+            this.custom = true;
+        } else {
+            this.custom = false;
+        }
         this._forceUpdate();
     }
 
-    public _ng_isBaunRateCustom(): boolean {
-        return this._ng_baudrateListed === -1;
+    public _ng_change() {
+        this.optionChange.emit(true);
     }
 
     public getOptions(): IOptions {
         return {
             path: this.path,
             options: {
-                baudRate: this._getBaudRate(),
-                lock: this._lockCom.getValue(),
-                parity: this._parityCom.getValue(),
-                dataBits: this._dataBitsCom.getValue(),
-                xany: this._xanyCom.getValue(),
-                xoff: this._xoffCom.getValue(),
-                xon: this._xonCom.getValue(),
-                rtscts: this._rtsctsCom.getValue(),
-                highWaterMark: this._highWaterMarkCom.getValue() as number,
-                stopBits: this._stopBitsCom.getValue(),
+                baudRate: this.baudRate === -1 ? Number(this.baudRateInput.value) : this.baudRate,
+                lock: this.lock,
+                parity: this.parity,
+                dataBits: this.dataBits,
+                xany: this.xany,
+                xoff: this.xoff,
+                xon: this.xon,
+                rtscts: this.rtscts,
+                highWaterMark: this.highWaterMark,
+                stopBits: this.stopBits,
             },
             reader: {
-                encoding: this._encodingCom.getValue(),
+                encoding: this.encoding,
                 delimiter: this._getDelimiter(),
                 includeDelimiter: false
             }
         };
     }
 
-    private _getDelimiter(): string {
-        const delimiter: string = this._delimiterCom.getValue() as string;
-        return `${delimiter}`.replace(/\\n/gi, '\n').replace(/\\r/gi, '\r').replace(/\\t/gi, '\t');
+    private _setOptions(options: IOptions) {
+        const cBaudRate = options.options.baudRate;
+
+        if (this._ng_baudrateItems.find(item => item.value === cBaudRate)) {
+            this.baudRate = cBaudRate;
+        } else {
+            this.custom = true;
+            this.baudRate = -1;
+            this.baudRateInput.setValue(cBaudRate);
+        }
+
+        this.dataBits = options.options.dataBits;
+
+        this.stopBits = options.options.stopBits;
+
+        this.parity = options.options.parity;
+
+        this.encoding = options.reader.encoding;
+
+        this.highWaterMark = options.options.highWaterMark;
+        this.delimiter = options.reader.delimiter;
+
+        this.lock = options.options.lock;
+        this.rtscts = options.options.rtscts;
+        this.xon = options.options.xon;
+        this.xoff = options.options.xoff;
+        this.xany = options.options.xany;
     }
 
-    private _getBaudRate(): number {
-        const value = this._baudRateInputCom !== undefined ? this._baudRateInputCom.getValue() : this._baudRateDDCom.getValue();
-        return typeof value === 'string' ? parseInt(value, 10) : value;
+    private _getDelimiter(): string {
+        const delimiter: string | number[] = this.delimiter;
+        return `${delimiter}`.replace(/\\n/gi, '\n').replace(/\\r/gi, '\r').replace(/\\t/gi, '\t');
     }
 
     private _forceUpdate() {
