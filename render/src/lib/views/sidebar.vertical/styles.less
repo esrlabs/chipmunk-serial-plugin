@@ -9,17 +9,6 @@
     bottom: 0.5rem;
     overflow-x: hidden;
     overflow-y: auto;
-    & p.t-normal{
-        color: #FFFFFF;
-    }
-    & span.reload-ports{
-        position: absolute;
-        top: 1px;
-        right: 0;
-    }
-    & div.controlls{
-        text-align: right;
-    }
     & ul.ports {
         position: relative;
         display: block;
@@ -41,36 +30,16 @@
                 background: @scheme-color-4;
             }
         }
+        & button {
+            margin-top: 10px;
+            width: 100%;
+        }
         &.connected{
             & li.port{
                 &:hover{
                     background: none;
                 }
             }
-        }
-    }
-    & div.error{
-        position: relative;
-        padding: 0.5rem 0;
-    }
-    & .container{
-        position: relative;
-        display: block;
-        box-sizing: border-box;
-        width: 100%;
-        overflow: hidden;
-        & div.input-wrapper {
-            position: relative;
-            display: inline-block;
-            height: 1.5rem;
-            width: ~"calc(70% + 1rem)";
-            margin-left: -0.5rem;
-        }
-        & div.dropdown{
-            position: relative;
-            display: inline-block;
-            width: 25%;
-            border: 1px solid @scheme-color-4;
         }
     }
 }

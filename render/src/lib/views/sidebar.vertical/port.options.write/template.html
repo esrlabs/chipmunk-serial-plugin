@@ -1,52 +1,89 @@
-<ul class="settings">
-    <li class="setting">
-        <p class="t-small color-scheme-2">Baud rate</p>
-        <lib-primitive-dropdownlist #baudRateDDCom [items]="_ng_baudrateItems" [defaults]="baudRate" [onChange]="_ng_onBaudRateDDChange"></lib-primitive-dropdownlist>
-        <span *ngIf="_ng_isBaunRateCustom()"  class="delimiter"></span>
-        <lib-primitive-input *ngIf="_ng_isBaunRateCustom()" #baudRateInputCom [value]="baudRate" [type]="'number'"></lib-primitive-input>
-    </li>
-    <li>
-        <p class="t-small color-scheme-2">Data bits</p>
-        <lib-primitive-dropdownlist #dataBitsCom [items]="_ng_databitsItems" [defaults]="dataBits"></lib-primitive-dropdownlist>
-    </li>
-    <li class="setting">
-        <p class="t-small color-scheme-2">Stop bits</p>
-        <lib-primitive-dropdownlist #stopBitsCom [items]="_ng_stopbitsItems" [defaults]="stopBits"></lib-primitive-dropdownlist>
-    </li>
-    <li class="setting">
-        <p class="t-small color-scheme-2">Parity</p>
-        <lib-primitive-dropdownlist #parityCom [items]="_ng_parityItems" [defaults]="parity"></lib-primitive-dropdownlist>
-    </li>
-    <li class="setting">
-        <p class="t-small color-scheme-2">Encoding</p>
-        <lib-primitive-dropdownlist #encodingCom [items]="_ng_encodingItems" [defaults]="encoding"></lib-primitive-dropdownlist>
-    </li>
-    <li class="setting">
-        <p class="t-small color-scheme-2">High water mark, bytes</p>
-        <lib-primitive-input #highWaterMarkCom [value]="highWaterMark" [type]="'number'"></lib-primitive-input>
-    </li>
-    <li class="setting">
-        <p class="t-small color-scheme-2">Line delimiter</p>
-        <lib-primitive-input #delimiterCom [value]="delimiter" [type]="'text'"></lib-primitive-input>
-    </li>
-    <li class="setting">
-        <p class="t-small color-scheme-2">Locking</p>
-        <lib-primitive-checkbox-simple #lockCom [labelOn]="'Port will be locked'" [labelOff]="'Port will not be locked'" [checked]="lock"></lib-primitive-checkbox-simple>
-    </li>
-    <li class="setting">
-        <p class="t-small color-scheme-2">RTSCTS</p>
-        <lib-primitive-checkbox-simple #rtsctsCom [labelOn]="'Active (true)'" [labelOff]="'Inactive (false)'" [checked]="rtscts"></lib-primitive-checkbox-simple>
-    </li>
-    <li class="setting">
-        <p class="t-small color-scheme-2">xON</p>
-        <lib-primitive-checkbox-simple #xonCom [labelOn]="'Active (true)'" [labelOff]="'Inactive (false)'" [checked]="xon"></lib-primitive-checkbox-simple>
-    </li>
-    <li class="setting">
-        <p class="t-small color-scheme-2">xOFF</p>
-        <lib-primitive-checkbox-simple #xoffCom [labelOn]="'Active (true)'" [labelOff]="'Inactive (false)'" [checked]="xoff"></lib-primitive-checkbox-simple>
-    </li>
-    <li class="setting">
-        <p class="t-small color-scheme-2">xANY</p>
-        <lib-primitive-checkbox-simple #xanyCom [labelOn]="'Active (true)'" [labelOff]="'Inactive (false)'" [checked]="xany"></lib-primitive-checkbox-simple>
-    </li>
-</ul>
+<mat-form-field>
+    <mat-label>Baud rate</mat-label>
+    <mat-select [(ngModel)]="baudRate" [placeholder]="baudRatePlaceholder" (selectionChange)="_ng_change(); _ng_onBRChange()">
+        <mat-option *ngFor="let baudRateItem of _ng_baudrateItems" [value]="baudRateItem.value">
+            {{baudRateItem.caption}}
+        </mat-option>
+    </mat-select>
+</mat-form-field>
+
+<mat-form-field *ngIf="custom">
+    <input matInput type="'text'" [formControl]="baudRateInput" [placeholder]="'Type your custom baud rate'" [value]="(baudRate === -1) ? baudRateInput.value : baudRate" (keyup)="_ng_change()"/>
+    <mat-error *ngIf="baudRateInput.hasError('pattern')">
+        Please enter a valid Baud rate
+    </mat-error>
+    <mat-error *ngIf="baudRateInput.hasError('required')">
+        Baud rate is required!
+    </mat-error>
+</mat-form-field>
+
+<mat-form-field>
+    <mat-label>Data bits</mat-label>
+    <mat-select [(ngModel)]="dataBits" [placeholder]="dataBits" (selectionChange)="_ng_change()">
+        <mat-option *ngFor="let databitsItem of _ng_databitsItems" [value]="databitsItem.value">
+            {{databitsItem.caption}}
+        </mat-option>
+    </mat-select>
+</mat-form-field>
+
+<mat-form-field>
+    <mat-label>Stop bits</mat-label>
+    <mat-select [(ngModel)]="stopBits" [placeholder]="stopBits" (selectionChange)="_ng_change()">
+        <mat-option *ngFor="let stopbitsItem of _ng_stopbitsItems" [value]="stopbitsItem.value">
+            {{stopbitsItem.caption}}
+        </mat-option>
+    </mat-select>
+</mat-form-field>
+
+<mat-form-field>
+    <mat-label>Parity</mat-label>
+    <mat-select [(ngModel)]="parity" [placeholder]="parity" (selectionChange)="_ng_change()">
+        <mat-option *ngFor="let parityItem of _ng_parityItems" [value]="parityItem.value">
+            {{parityItem.caption}}
+        </mat-option>
+    </mat-select>
+</mat-form-field>
+
+<mat-form-field>
+    <mat-label>Encoding</mat-label>
+    <mat-select [(ngModel)]="encoding" [placeholder]="encoding" (selectionChange)="_ng_change()">
+        <mat-option *ngFor="let encodingItem of _ng_encodingItems" [value]="encodingItem.value">
+            {{encodingItem.caption}}
+        </mat-option>
+    </mat-select>
+</mat-form-field>
+
+<mat-form-field>
+    <input matInput [(ngModel)]="highWaterMark" type="'number'" (keyup)="_ng_change()" [placeholder]="'High water mark, bytes'"/>
+</mat-form-field>
+
+<mat-form-field>
+    <input matInput [(ngModel)]="delimiter" type="'text'" (keyup)="_ng_change()" [placeholder]="'Line delimiter'"/>
+</mat-form-field>
+
+<mat-list>
+    <mat-list-item>
+        <mat-checkbox [(ngModel)]="lock" (change)="_ng_change()"></mat-checkbox>
+        <span>Lock port</span>
+    </mat-list-item>
+
+    <mat-list-item>
+        <mat-checkbox [(ngModel)]="rtscts" (change)="_ng_change()"></mat-checkbox>
+        <span>RTSCTS</span>
+    </mat-list-item>
+
+    <mat-list-item>
+        <mat-checkbox [(ngModel)]="xon" [checked]="false" (change)="_ng_change()"></mat-checkbox>
+        <span>xON</span>
+    </mat-list-item>
+
+    <mat-list-item>
+        <mat-checkbox [(ngModel)]="xoff" [checked]="false" (change)="_ng_change()"></mat-checkbox>
+        <span>xOFF</span>
+    </mat-list-item>
+
+    <mat-list-item>
+        <mat-checkbox [(ngModel)]="xany" [checked]="false" (change)="_ng_change()"></mat-checkbox>
+        <span>xANY</span>
+    </mat-list-item>
+</mat-list>

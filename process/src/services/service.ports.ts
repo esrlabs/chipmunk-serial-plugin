@@ -202,6 +202,7 @@ class ServicePorts {
         if (listeners === undefined) {
             return;
         }
+
         listeners.forEach((listeners: IListeners) => {
             listeners.onData(chunk);
         });
@@ -241,6 +242,7 @@ class ServicePorts {
     private _updateConnectedPortsState() {
         clearTimeout(this._connectedPortsState.timer);
         this._connectedPortsState.state = {};
+
         this._controllers.forEach((controller: ControllerSerialPort) => {
             this._connectedPortsState.state[controller.getPath()] = {
                 connections: this._getConnectionsCount(controller.getPath()),
