@@ -1,5 +1,0 @@
-<lib-sb-port-options-write-com #optionsCom [path]="port.path" [options]="options"></lib-sb-port-options-write-com>
-<button mat-raised-button *ngIf="!isConnected" (click)="onConnect(getOptions())">Connect</button>
-<button mat-raised-button *ngIf="isConnected" (click)="onDisconnect()">Disconnect</button>
-<button mat-raised-button *ngIf="isConnected" (click)="onReconnect(getOptions())" [disabled]="!changed">Reconnect</button>
-<button mat-raised-button (click)="onCancel()">Cancel</button>

@@ -1,7 +1,9 @@
 import * as Toolkit from 'chipmunk.client.toolkit';
 import { SerialPortRowRenderAPI } from './render.api';
 
-export class SerialPortRowRender extends Toolkit.ATypedRowRender<SerialPortRowRenderAPI> {
+export const CPluginName = 'chipmunk-serial-plugin';
+
+export class SerialPortRowRender extends Toolkit.TypedRowRender<SerialPortRowRenderAPI> {
 
     private _api: SerialPortRowRenderAPI = new SerialPortRowRenderAPI();
 
@@ -14,7 +16,7 @@ export class SerialPortRowRender extends Toolkit.ATypedRowRender<SerialPortRowRe
     }
 
     public isTypeMatch(sourceName: string): boolean {
-        return sourceName === 'serial';
+        return sourceName === CPluginName;
     }
 
     public getAPI(): SerialPortRowRenderAPI {

@@ -1,7 +1,8 @@
 <div class="container">
     <div class="info">
         <div class="right">
-            <p [className]="'indicator ' + (_ng_isConnected ? 'connected' : 'disconnected')"></p>
+            <mat-icon *ngIf="_ng_isConnected">power</mat-icon>
+            <mat-icon *ngIf="!_ng_isConnected">power_off</mat-icon>
             <p>{{port.path}}</p>
             <p class="size t-small color-scheme-2">{{_ng_read()}}</p>
         </div>
