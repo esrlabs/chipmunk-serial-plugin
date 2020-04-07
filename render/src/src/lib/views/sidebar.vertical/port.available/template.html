@@ -1,0 +1,25 @@
+<div class="container">
+    <div class="info">
+        <div class="right">
+            <mat-icon *ngIf="_ng_isConnected">power</mat-icon>
+            <mat-icon *ngIf="!_ng_isConnected">power_off</mat-icon>
+            <p>{{port.path}}</p>
+            <p class="size t-small color-scheme-2">{{_ng_read()}}</p>
+        </div>
+        <mat-icon (click)="_ng_onOptions()">settings</mat-icon>
+    </div>
+    <div class="canvas">
+        <div class="holder">
+            <canvas #canvas [attr.id]="'canvas_' + port.path"></canvas>
+        </div>
+    </div>
+    <div *ngIf="_ng_isConnected">
+        <mat-form-field class="recent-files outline regular" appearance="outline">
+            <input  matInput
+                    type="text" 
+                    placeholder="Type a command"
+                    (keyup.enter)="_ng_send($event)"
+                    aria-label="Filter">
+        </mat-form-field>
+    </div>
+</div>
