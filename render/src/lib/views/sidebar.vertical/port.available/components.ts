@@ -4,7 +4,7 @@ import { Component, OnDestroy, Input, AfterViewInit, ViewChildren, QueryList, El
 import { IPortInfo, IPortState } from '../../../common/interface.portinfo';
 import Chart from 'chart.js';
 import { Subscription, Subject } from 'rxjs';
-import Service from '../../../services/service';
+import Service, { IPort } from '../../../services/service';
 import { EHostEvents } from '../../../common/host.events';
 import { SidebarVerticalPortDialogComponent } from '../port.options/component';
 import { IOptions, CDefaultOptions } from '../../../common/interface.options';
@@ -17,9 +17,8 @@ interface Irgb {
     opacity: number;
 }
 
-const COptions = {
-    STEP: 300
-};
+const LIMIT = 300;
+const ANIMATION = 5000;
 
 @Component({
     selector: 'lib-dia-port-available-com',
@@ -34,17 +33,14 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
 
     @ViewChildren('canvas') canvases: QueryList<ElementRef>;
 
-    readonly animation = 5000;
-
     private _subscriptions: { [key: string]: Subscription } = {};
     private _canvas: ElementRef<HTMLCanvasElement>;
     private _ctx: any;
     private _read: number = 0;
-    private _readSum: number = 0;
     private _chart: Chart;
-    private _chart_data = new Array<number>(30);
-    private _chart_labels = new Array(COptions.STEP).fill('');
-    private _chart_limit: number;
+    private _chart_label_limit: number;
+    private _chart_data_limit = 30;
+    private _chart_labels = new Array(LIMIT).fill('');
     private _destroyed: boolean = false;
     private _options: IOptions;
     private _defaultOptions: IOptions = Object.assign({}, CDefaultOptions);
@@ -57,46 +53,53 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
     }
 
     ngAfterViewInit() {
-        this._canvas = this.canvases.find(canvas => canvas.nativeElement.id === `canvas_${this.port.path}`);
         this._createChart();
+        this._loadSession();
         this._subscriptions.Subscription = this.observables.tick.subscribe((tick: boolean) => {
             if (tick) {
                 this._update();
             }
+            this._forceUpdate();
         });
 
         this._subscriptions.Subscription = this.observables.resize.subscribe((size: any) => {
             this._sidebar_width = size.sidebar_width;
-            this._chart_limit = Math.round(this._sidebar_width / 10);
-            this._chart.config.data.labels = this._chart_labels.slice(0, this._chart_limit);
+            this._chart_label_limit = Math.ceil(this._sidebar_width / 10);
+            this._chart.config.data.labels = this._chart_labels.slice(0, this._chart_label_limit);
+
+            this._chart_data_limit = Math.ceil(this._sidebar_width / 10);
+
+            console.log(this._chart.data.labels);
+            console.log(this._chart.data.datasets[0].data);
         });
 
         this._subscriptions.Subscription = Service.getObservable().event.subscribe((message: any) => {
             if (message.event === EHostEvents.spyState && message.load[this.port.path]) {
                 this._read = message.load[this.port.path];
-                this._readSum += this._read;
-            } else if (message.event === EHostEvents.state && message.state[this.port.path].ioState.read) {
+            } else if (message.event === EHostEvents.state && message.state[this.port.path]) {
                 this._read = message.state[this.port.path].ioState.read;
-                this._readSum += this._read;
             }
-            this._forceUpdate();
         });
-
-        Service.startSpy([this._defaultOptions]);
     }
 
     ngOnInit() {
         this._session = Service.getSessionID();
-        this._loadSession();
         this._defaultOptions.path = this.port.path;
     }
 
     ngOnDestroy() {
-        this._saveSession();
+        const cSessionPort = this._getSessionPort();
+        if (cSessionPort) {
+            cSessionPort.limit = this._chart_data_limit;
+        } else {
+            console.error('Something went wrong with the SessionPort entry');
+        }
+
         if (this._chart) {
             this._chart.destroy();
             this._chart = undefined;
         }
+
         Object.keys(this._subscriptions).forEach((key: string) => {
             this._subscriptions[key].unsubscribe();
         });
@@ -111,30 +114,22 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
     }
 
     private _loadSession() {
-        const cSessionPort = Service.sessionPort[this._session];
-        if (cSessionPort && cSessionPort[this.port.path]) {
-            const cPort = cSessionPort[this.port.path];
-            this._ng_isConnected = cPort.connected;
-            this._readSum = cPort.read;
-            this._chart_data = cPort.sparkline_data;
-            this._chart_limit = cPort.sparkline_limit;
+        const cSessionPort = this._getSessionPort();
+        if (cSessionPort) {
+            this._chart_data_limit = cSessionPort.limit;
+            this._ng_isConnected = cSessionPort.connected;
+
+            this._chart.config.data.datasets[0].data = cSessionPort.sparkline_data.slice(LIMIT - this._chart_data_limit);
+
+            if (cSessionPort.spying === false) {
+                Service.startSpy([this._defaultOptions]).then(() => {
+                    cSessionPort.spying = true;
+                }).catch((error: Error) => {
+                    Service.notify('Error', `Error occurred while starting to spy: ${error.message}`, ENotificationType.error);
+                });
+            }
         } else {
             console.error('Something went wrong while loading the session');
-        }
-    }
-
-    private _saveSession() {
-        const cSessionPort = Service.sessionPort[this._session];
-        if (cSessionPort) {
-            cSessionPort[this.port.path] = {
-                connected: this._ng_isConnected,
-                read: this._readSum,
-                sparkline_data: this._chart_data,
-                sparkline_limit: this._chart_limit,
-                written: 0
-            };
-        } else {
-            console.error('The session does not exist on service to save the data');
         }
     }
 
@@ -167,46 +162,60 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
     }
 
     private _createChart() {
+        this._canvas = this.canvases.find(canvas => canvas.nativeElement.id === `canvas_${this.port.path}`);
         this._ctx = this._canvas.nativeElement.getContext('2d');
-        if (this._chart_limit === null) {
-            this._chart_limit = this._canvas.nativeElement.width / 10;
+        if (this._chart_label_limit === undefined) {
+            this._chart_label_limit = this._canvas.nativeElement.width / 10;
         }
-        this._chart = new Chart(this._ctx, {
-            type: 'line',
-            data: {
-                labels: this._chart_labels.slice(0, this._chart_limit),
-                datasets: [{
-                    data: this._chart_data,
-                    borderColor: this._colorize(),
-                    pointRadius: 0,
-                    fill: false,
-                }]
-            },
-            options: {
-                maintainAspectRatio: false,
-                animation: {
-                    duration: this.animation,
-                },
-                scales: {
-                    xAxes: [{
-                        display: false,
-                    }],
-                    yAxes: [{
-                        display: false,
-                        stacked: true,
-                        ticks: {
-                            beginAtZero: true,
-                        },
-                        gridLines: {
-                            drawOnChartArea: false
-                        }
+        const cSessionPort = this._getSessionPort();
+        if (cSessionPort) {
+            this._chart = new Chart(this._ctx, {
+                type: 'line',
+                data: {
+                    labels: this._chart_labels.slice(0, this._chart_label_limit),
+                    datasets: [{
+                        data: cSessionPort.sparkline_data.slice(LIMIT - this._chart_data_limit),
+                        borderColor: this._colorize(),
+                        pointRadius: 0,
+                        fill: false,
                     }]
                 },
-                legend: {
-                    display: false
+                options: {
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: ANIMATION,
+                    },
+                    scales: {
+                        xAxes: [{
+                            display: false,
+                        }],
+                        yAxes: [{
+                            display: false,
+                            stacked: true,
+                            ticks: {
+                                beginAtZero: true,
+                            },
+                            gridLines: {
+                                drawOnChartArea: false
+                            }
+                        }]
+                    },
+                    legend: {
+                        display: false
+                    }
                 }
-            }
-        });
+            });
+        } else {
+            console.error('Something went wrong with the SessionPort entry');
+        }
+    }
+
+    private _getSessionPort(): IPort {
+        const cSessionPort = Service.sessionPort[this._session];
+        if (cSessionPort && cSessionPort[this.port.path]) {
+            return cSessionPort[this.port.path];
+        }
+        return null;
     }
 
     private _update() {
@@ -214,15 +223,26 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
             return;
         }
         if (this._chart) {
-            this._chart_data.shift();
-            this._chart_data.push(this._read);
+            const cSessionPort = this._getSessionPort();
+            if (cSessionPort) {
+                cSessionPort.read += this._read;
+                cSessionPort.sparkline_data.shift();
+                cSessionPort.sparkline_data.push(this._read);
+            } else {
+                console.error('Something went wrong with the SessionPort entry');
+            }
+
+            const cData = this._chart.config.data.datasets[0].data;
+            cData.shift();
+            cData.push(this._read);
+
             this._read = 0;
             this._chart.update();
         }
     }
 
     public _ng_read(): string {
-        return this._formatLoad(this._readSum);
+        return this._formatLoad(Service.sessionPort[this._session][this.port.path].read);
     }
 
     public _ng_send(event: any) {
@@ -249,11 +269,18 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
                         }
                         Service.stopSpy([this._defaultOptions]).then(() => {
                             Service.connect(portOptions).then(() => {
-                                this._readSum = 0;
-                                this._chart_data = new Array<number>(COptions.STEP);
-                                this._chart.config.data.datasets[0].data = this._chart_data;
+
                                 this._options = portOptions;
                                 this._ng_isConnected = true;
+
+                                const cSessionPort = this._getSessionPort();
+                                if (cSessionPort) {
+                                    cSessionPort.connected = this._ng_isConnected;
+                                    cSessionPort.spying = false;
+                                    cSessionPort.read = 0;
+                                } else {
+                                    console.error('Something went wrong with the SessionPort entry');
+                                }
                                 Service.removePopup();
                             }).catch((error: Error) => {
                                 Service.notify('Error', `Fail to open port ${this.port.path}: ${error.message}`, ENotificationType.error);
@@ -264,11 +291,15 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
                     },
                     onDisconnect: () => {
                         Service.disconnect(this.port.path).then(() => {
-                            this._readSum = 0;
-                            this._chart_data = new Array<number>(COptions.STEP);
-                            this._chart.config.data.datasets[0].data = this._chart_data;
+                            this._ng_isConnected = false;
                             Service.startSpy([this._defaultOptions]).then(() => {
-                                this._ng_isConnected = false;
+                                const cSessionPort = this._getSessionPort();
+                                if (cSessionPort) {
+                                    cSessionPort.spying = true;
+                                    cSessionPort.read = 0;
+                                } else {
+                                    console.error('Something went wrong with the SessionPort entry');
+                                }
                             });
                             Service.removePopup();
                         }).catch((error: Error) => {

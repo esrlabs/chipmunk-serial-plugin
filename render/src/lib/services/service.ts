@@ -5,19 +5,21 @@ import { IOptions } from '../common/interface.options';
 import { Observable, Subject } from 'rxjs';
 import { IPortState, IPortInfo } from '../common/interface.portinfo';
 
-interface IPort {
+export interface IPort {
     connected: boolean;
     read: number;
     written: number;
-    sparkline_limit: number;
+    limit: number;
     sparkline_data: Array<number>;
+    spying: boolean;
 }
+
+const LIMIT = 300;
 
 export class Service extends Toolkit.APluginService {
 
     public state:  {[port: string]: IPortState} = {};
     public sessionPort: {[session: string]: {[port: string]: IPort}} = {};
-    public ports: IPortInfo[];
 
     private _api: Toolkit.IAPI | undefined;
     private _session: string;
@@ -48,7 +50,6 @@ export class Service extends Toolkit.APluginService {
     }
 
     private _onSessionOpen() {
-
         this._session = this._api.getActiveSessionId();
         this._createSessionEntries();
         this.incomeMessage();
@@ -67,15 +68,15 @@ export class Service extends Toolkit.APluginService {
             this.sessionPort[this._session] = {};
         }
         this.requestPorts().then(resolve => {
-            Object.assign(this.ports = resolve.ports);
-            this.ports.forEach((port: IPortInfo) => {
+            resolve.ports.forEach((port: IPortInfo) => {
                 if (this.sessionPort[this._session][port.path] === undefined) {
                     this.sessionPort[this._session][port.path] = {
                         connected: false,
                         read: 0,
-                        sparkline_data: new Array<number>(300),
-                        sparkline_limit: 0,
-                        written: 0
+                        written: 0,
+                        limit: 30,
+                        sparkline_data: new Array<number>(LIMIT),
+                        spying: false
                     };
                 }
             });
@@ -100,16 +101,16 @@ export class Service extends Toolkit.APluginService {
             if (typeof message !== 'object' && message === null) {
                 return;
             }
-            if (message.streamId !== this._session && message.streamId !== '*') {
-                return;
-            }
             if (message.event === EHostEvents.spyState || message.event === EHostEvents.state) {
                 Object.keys(this.sessionPort).forEach((session: string) => {
                     Object.keys(this.sessionPort[session]).forEach((path: string) => {
+                        this.sessionPort[session][path].sparkline_data.shift();
                         if (message.event === EHostEvents.state && message.state[path]) {
                             this.sessionPort[session][path].read += message.state[path].ioState.read;
+                            this.sessionPort[session][path].sparkline_data.push(message.state[path].ioState.read)
                         } else if (message.event === EHostEvents.spyState && message.load[path]) {
                             this.sessionPort[session][path].read += message.load[path];
+                            this.sessionPort[session][path].sparkline_data.push(message.load[path]);
                         }
                     });
                 });
@@ -153,7 +154,6 @@ export class Service extends Toolkit.APluginService {
             path: port,
         }, this._session).then(() => {
             this._openQueue[port] = false;
-            delete this.sessionPort[this._session][port];
         }).catch((error: Error) => {
             this.notify('error', `Failed to disconnect from ${port}: ${error.message}`, ENotificationType.error);
         });
@@ -263,24 +263,6 @@ export class Service extends Toolkit.APluginService {
     public getSessionID(): string {
         return this._session;
     }
-
-    // public setSparklineOptions(session: string, path: string, data: Array<number>, limit: number) {
-    //     if (this._sparklineOptions[session] === undefined) {
-    //         this._sparklineOptions[session] = {};
-    //     }
-    //     this._sparklineOptions[session][path] = {spark_data: data, spark_labels: limit};
-    // }
-
-    // public getSparklineOptions(session: string, path: string): ISparkline {
-    //     if (this._sparklineOptions[session] === undefined) {
-    //         return {spark_data: new Array<number>(this._sparkline_limit), spark_labels: null};
-    //     }
-    //     return this._sparklineOptions[session][path];
-    // }
-
-    // public setSparklineLimit(limit: number) {
-    //     this._sparkline_limit = limit;
-    // }
 }
 
 export default (new Service());

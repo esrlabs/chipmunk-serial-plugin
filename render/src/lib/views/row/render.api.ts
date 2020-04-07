@@ -2,7 +2,7 @@
 
 import * as Toolkit from 'chipmunk.client.toolkit';
 
-export class SerialPortRowRenderAPI extends Toolkit.ATypedRowRenderAPIExternal {
+export class SerialPortRowRenderAPI extends Toolkit.TypedRowRenderAPIExternal {
 
     private _selector: string = 'lib-serial-row-component';
 
