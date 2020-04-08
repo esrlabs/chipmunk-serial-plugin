@@ -1,7 +1,7 @@
 // tslint:disable:no-inferrable-types
 
 import { Component, OnDestroy, Input, AfterViewInit, ViewChildren, QueryList, ElementRef, ChangeDetectorRef, OnInit } from '@angular/core';
-import { IPortInfo, IPortState } from '../../../common/interface.portinfo';
+import { IPortInfo } from '../../../common/interface.portinfo';
 import Chart from 'chart.js';
 import { Subscription, Subject } from 'rxjs';
 import Service, { IPort } from '../../../services/service';
@@ -62,13 +62,12 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
         this._subscriptions.Subscription = this.observables.resize.subscribe((size: any) => {
 
             this._sidebar_width = size.sidebar_width;
-            Service.chart_label_limit = Math.ceil(this._sidebar_width / 10);
-            this._chart.config.data.labels = this._chart_labels.slice(0, Service.chart_label_limit);
+            Service.chart_limit = Math.ceil(this._sidebar_width / 10);
+            this._chart.config.data.labels = this._chart_labels.slice(0, Service.chart_limit);
 
             const cSessionPort = this._getSessionPort();
             if (cSessionPort) {
-                const cSparklineData = cSessionPort.sparkline_data;
-                this._chart.config.data.datasets[0].data = cSparklineData.slice(cSparklineData.length - Service.chart_label_limit);
+                this._chart.config.data.datasets[0].data = cSessionPort.sparkline_data.slice(0, Service.chart_limit + 1);
             } else {
                 console.error('Something went wrong while loading the session');
             }
@@ -109,12 +108,11 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
 
     private _loadSession() {
         const cSessionPort = this._getSessionPort();
+        this._chart.config.options.animation.duration = 5000;
         if (cSessionPort) {
             this._ng_isConnected = cSessionPort.connected;
-
-            const cSparklineData = cSessionPort.sparkline_data;
-            this._chart.config.data.datasets[0].data = cSparklineData.slice(cSparklineData.length - Service.chart_label_limit);
-            this._chart.config.data.labels = this._chart_labels.slice(0, Service.chart_label_limit);
+            this._chart.config.data.datasets[0].data = cSessionPort.sparkline_data.slice(0, Service.chart_limit + 1);
+            this._chart.config.data.labels = this._chart_labels.slice(0, Service.chart_limit);
 
             if (cSessionPort.spying === false) {
                 Service.startSpy([this._defaultOptions]).then(() => {
@@ -142,20 +140,6 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
         return read;
     }
 
-    private _color(): number {
-        return Math.round(Math.random() * 255);
-    }
-
-    private _colorize(): string {
-        const rgb: Irgb = {
-            red: this._color(),
-            green: this._color(),
-            blue: this._color(),
-            opacity: 1,
-        };
-        return `rgba(${rgb.red}, ${rgb.green}, ${rgb.blue}, ${rgb.opacity})`;
-    }
-
     private _createChart() {
         this._canvas = this.canvases.find(canvas => canvas.nativeElement.id === `canvas_${this.port.path}`);
         this._ctx = this._canvas.nativeElement.getContext('2d');
@@ -166,17 +150,19 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
             this._chart = new Chart(this._ctx, {
                 type: 'line',
                 data: {
-                    labels: this._chart_labels.slice(0, Service.chart_label_limit),
+                    labels: this._chart_labels.slice(0, Service.chart_limit),
                     datasets: [{
-                        data: cSparklineData.slice(cSparklineData.length - Service.chart_label_limit),
-                        borderColor: this._colorize(),
+                        data: cSparklineData.slice(cSparklineData.length - Service.chart_limit),
+                        borderColor: Service.portColor[this.port.path],
                         pointRadius: 0,
                         fill: false,
                     }]
                 },
                 options: {
                     maintainAspectRatio: false,
-                    animation: false,
+                    animation: {
+                        duration: 0
+                    },
                     scales: {
                         xAxes: [{
                             display: false,
@@ -218,15 +204,15 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
             const cSessionPort = this._getSessionPort();
             if (cSessionPort) {
                 cSessionPort.read += this._read;
-                cSessionPort.sparkline_data.shift();
-                cSessionPort.sparkline_data.push(this._read);
+                cSessionPort.sparkline_data.pop();
+                cSessionPort.sparkline_data.unshift(this._read);
             } else {
                 console.error('Something went wrong with the SessionPort entry');
             }
 
             const cData = this._chart.config.data.datasets[0].data;
-            cData.shift();
-            cData.push(this._read);
+            cData.pop();
+            cData.unshift(this._read);
 
             this._read = 0;
             this._chart.update();

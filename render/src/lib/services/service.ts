@@ -4,6 +4,7 @@ import { EHostCommands, EHostEvents } from '../common/host.events';
 import { IOptions } from '../common/interface.options';
 import { Observable, Subject } from 'rxjs';
 import { IPortState, IPortInfo } from '../common/interface.portinfo';
+import ServiceSignatures, { ISignature } from './service.signatures';
 
 export interface IPort {
     connected: boolean;
@@ -20,7 +21,8 @@ export class Service extends Toolkit.APluginService {
 
     public state:  {[port: string]: IPortState} = {};
     public sessionPort: {[session: string]: {[port: string]: IPort}} = {};
-    public chart_label_limit = 30;
+    public portColor: {[path: string]: string} = {};
+    public chart_limit = 30;
 
     private _api: Toolkit.IAPI | undefined;
     private _session: string;
@@ -69,6 +71,7 @@ export class Service extends Toolkit.APluginService {
             this.sessionPort[this._session] = {};
         }
         this.requestPorts().then(resolve => {
+            this._setColor(resolve.ports);
             resolve.ports.forEach((port: IPortInfo) => {
                 if (this.sessionPort[this._session][port.path] === undefined) {
                     this.sessionPort[this._session][port.path] = {
@@ -83,6 +86,24 @@ export class Service extends Toolkit.APluginService {
             });
         }).catch((error: Error) => {
             this.notify('Error', `Fail to get ports list due error: ${error.message}`, ENotificationType.error);
+        });
+    }
+
+    private _emptyQueue(port: string) {
+        if (this._messageQueue[port]) {
+            this._messageQueue[port].forEach((message) => {
+                this.sendMessage(message, port);
+            });
+        }
+    }
+
+    private _setColor(ports: IPortInfo[]) {
+        ports.forEach((port: IPortInfo) => {
+            if (this.portColor[port.path] === undefined) {
+                const cDirtyPath = '\u0004' + port.path + '\u0004';
+                const cSignature = ServiceSignatures.getSignature(cDirtyPath);
+                this.portColor[port.path] = cSignature.color;
+            }
         });
     }
 
@@ -108,7 +129,7 @@ export class Service extends Toolkit.APluginService {
                         this.sessionPort[session][path].sparkline_data.shift();
                         if (message.event === EHostEvents.state && message.state[path]) {
                             this.sessionPort[session][path].read += message.state[path].ioState.read;
-                            this.sessionPort[session][path].sparkline_data.push(message.state[path].ioState.read)
+                            this.sessionPort[session][path].sparkline_data.push(message.state[path].ioState.read);
                         } else if (message.event === EHostEvents.spyState && message.load[path]) {
                             this.sessionPort[session][path].read += message.load[path];
                             this.sessionPort[session][path].sparkline_data.push(message.load[path]);
@@ -118,14 +139,6 @@ export class Service extends Toolkit.APluginService {
             }
             this._subjects.event.next(message);
         });
-    }
-
-    private _emptyQueue(port: string) {
-        if (this._messageQueue[port]) {
-            this._messageQueue[port].forEach((message) => {
-                this.sendMessage(message, port);
-            });
-        }
     }
 
     public connect(options: IOptions): Promise<void> {
