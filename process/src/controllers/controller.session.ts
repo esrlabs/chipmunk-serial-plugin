@@ -98,7 +98,6 @@ export class ControllerSession {
             this._readLoad = {};
             Promise.all(
                 options.map((option: IOptions) => {
-                    this._ports.push(option.path);
                     return ServicePorts.refPort(PSEUDO_SESSION, option, {
                         onData: this._readSpyLoad.bind(this, option.path),
                         onError: this._onPortError.bind(this, option.path),
@@ -119,10 +118,6 @@ export class ControllerSession {
         return new Promise((resolve, reject) => {
             Promise.all(
                 options.map((option: IOptions) => {
-                    if (!this._isPortRefed(option.path)) {
-                        return reject(new Error(this._logger.error(`Port "${option.path}" isn't being spied on`)));
-                    }
-                    this._removePort(option.path);
                     return ServicePorts.unrefPort(PSEUDO_SESSION, option.path).then(() => {
                         this._logger.env('Stopping spying on: ' + option.path);
                     }).catch((error: Error) => {

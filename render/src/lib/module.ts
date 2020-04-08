@@ -2,8 +2,6 @@ import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { SidebarVerticalComponent } from './views/sidebar.vertical/component';
-import { SidebarVerticalPortInfoComponent } from './views/sidebar.vertical/port.listed/component';
-import { SidebarVerticalPortConnectedComponent } from './views/sidebar.vertical/port.connected/component';
 import { SidebarVerticalPortOptionsReadComponent } from './views/sidebar.vertical/port.options.read/component';
 import { SidebarVerticalPortOptionsWriteComponent } from './views/sidebar.vertical/port.options.write/component';
 import { DialogAvailablePortComponent } from './views/sidebar.vertical/port.available/components';
@@ -29,8 +27,6 @@ import { MatIconModule } from '@angular/material/icon';
 
 export {
     SidebarVerticalComponent,
-    SidebarVerticalPortInfoComponent,
-    SidebarVerticalPortConnectedComponent,
     SidebarVerticalPortOptionsReadComponent,
     SidebarVerticalPortOptionsWriteComponent,
     SidebarVerticalPortDialogComponent,
@@ -57,8 +53,6 @@ const Material = [
 
 const CComponents = [
     SidebarVerticalComponent,
-    SidebarVerticalPortInfoComponent,
-    SidebarVerticalPortConnectedComponent,
     SidebarVerticalPortOptionsReadComponent,
     SidebarVerticalPortOptionsWriteComponent,
     SidebarVerticalPortDialogComponent,

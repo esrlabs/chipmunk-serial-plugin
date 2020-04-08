@@ -55,7 +55,6 @@ export class ControllerSerialPort extends EventEmitter {
     private _logger: Logger;
     private _read: number = 0;
     private _written: number = 0;
-    private _signature: boolean = false;
     private _timeout: number = 50;
     private _size: number = 1;
 
@@ -150,12 +149,13 @@ export class ControllerSerialPort extends EventEmitter {
         }
     }
 
-    public getPath(): string {
-        return this._options.path;
+    public clearIOState() {
+        this._read = 0;
+        this._written = 0;
     }
 
-    public setSignature(value: boolean){
-        this._signature = value;
+    public getPath(): string {
+        return this._options.path;
     }
 
     private _refPortEvents(port: SerialPort) {
@@ -175,15 +175,11 @@ export class ControllerSerialPort extends EventEmitter {
             chunk = chunk.toString();
         }
         if (typeof chunk === 'string') {
-            if (this._signature) {
-                chunk = Buffer.from(chunk.split(/[\n\r]/gi).filter((row: string) => {
-                    return row !== '';
-                }).map((row: string) => {
-                    return `${CDelimiters.name}${this._options.path}${CDelimiters.name}: ${row}\n`;
-                }).join(''));
-            } else {
-                chunk = Buffer.from(`${chunk}\n`);
-            }
+            chunk = Buffer.from(chunk.split(/[\n\r]/gi).filter((row: string) => {
+                return row !== '';
+            }).map((row: string) => {
+                return `${CDelimiters.name}${this._options.path}${CDelimiters.name}: ${row}\n`;
+            }).join(''));
         }
         if (!(chunk instanceof Buffer)) {
             return;
