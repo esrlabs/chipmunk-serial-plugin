@@ -17,8 +17,7 @@ interface Irgb {
     opacity: number;
 }
 
-const LIMIT = 300;
-const ANIMATION = 5000;
+const LIMIT = 500;
 
 @Component({
     selector: 'lib-dia-port-available-com',
@@ -38,8 +37,6 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
     private _ctx: any;
     private _read: number = 0;
     private _chart: Chart;
-    private _chart_label_limit: number;
-    private _chart_data_limit = 30;
     private _chart_labels = new Array(LIMIT).fill('');
     private _destroyed: boolean = false;
     private _options: IOptions;
@@ -63,14 +60,18 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
         });
 
         this._subscriptions.Subscription = this.observables.resize.subscribe((size: any) => {
+
             this._sidebar_width = size.sidebar_width;
-            this._chart_label_limit = Math.ceil(this._sidebar_width / 10);
-            this._chart.config.data.labels = this._chart_labels.slice(0, this._chart_label_limit);
+            Service.chart_label_limit = Math.ceil(this._sidebar_width / 10);
+            this._chart.config.data.labels = this._chart_labels.slice(0, Service.chart_label_limit);
 
-            this._chart_data_limit = Math.ceil(this._sidebar_width / 10);
-
-            console.log(this._chart.data.labels);
-            console.log(this._chart.data.datasets[0].data);
+            const cSessionPort = this._getSessionPort();
+            if (cSessionPort) {
+                const cSparklineData = cSessionPort.sparkline_data;
+                this._chart.config.data.datasets[0].data = cSparklineData.slice(cSparklineData.length - Service.chart_label_limit);
+            } else {
+                console.error('Something went wrong while loading the session');
+            }
         });
 
         this._subscriptions.Subscription = Service.getObservable().event.subscribe((message: any) => {
@@ -88,13 +89,6 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
     }
 
     ngOnDestroy() {
-        const cSessionPort = this._getSessionPort();
-        if (cSessionPort) {
-            cSessionPort.limit = this._chart_data_limit;
-        } else {
-            console.error('Something went wrong with the SessionPort entry');
-        }
-
         if (this._chart) {
             this._chart.destroy();
             this._chart = undefined;
@@ -116,16 +110,17 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
     private _loadSession() {
         const cSessionPort = this._getSessionPort();
         if (cSessionPort) {
-            this._chart_data_limit = cSessionPort.limit;
             this._ng_isConnected = cSessionPort.connected;
 
-            this._chart.config.data.datasets[0].data = cSessionPort.sparkline_data.slice(LIMIT - this._chart_data_limit);
+            const cSparklineData = cSessionPort.sparkline_data;
+            this._chart.config.data.datasets[0].data = cSparklineData.slice(cSparklineData.length - Service.chart_label_limit);
+            this._chart.config.data.labels = this._chart_labels.slice(0, Service.chart_label_limit);
 
             if (cSessionPort.spying === false) {
                 Service.startSpy([this._defaultOptions]).then(() => {
                     cSessionPort.spying = true;
                 }).catch((error: Error) => {
-                    Service.notify('Error', `Error occurred while starting to spy: ${error.message}`, ENotificationType.error);
+                    Service.notify('Error', error.message, ENotificationType.error);
                 });
             }
         } else {
@@ -164,17 +159,16 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
     private _createChart() {
         this._canvas = this.canvases.find(canvas => canvas.nativeElement.id === `canvas_${this.port.path}`);
         this._ctx = this._canvas.nativeElement.getContext('2d');
-        if (this._chart_label_limit === undefined) {
-            this._chart_label_limit = this._canvas.nativeElement.width / 10;
-        }
+
         const cSessionPort = this._getSessionPort();
         if (cSessionPort) {
+            const cSparklineData = cSessionPort.sparkline_data;
             this._chart = new Chart(this._ctx, {
                 type: 'line',
                 data: {
-                    labels: this._chart_labels.slice(0, this._chart_label_limit),
+                    labels: this._chart_labels.slice(0, Service.chart_label_limit),
                     datasets: [{
-                        data: cSessionPort.sparkline_data.slice(LIMIT - this._chart_data_limit),
+                        data: cSparklineData.slice(cSparklineData.length - Service.chart_label_limit),
                         borderColor: this._colorize(),
                         pointRadius: 0,
                         fill: false,
@@ -182,9 +176,7 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
                 },
                 options: {
                     maintainAspectRatio: false,
-                    animation: {
-                        duration: ANIMATION,
-                    },
+                    animation: false,
                     scales: {
                         xAxes: [{
                             display: false,
@@ -283,10 +275,10 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
                                 }
                                 Service.removePopup();
                             }).catch((error: Error) => {
-                                Service.notify('Error', `Fail to open port ${this.port.path}: ${error.message}`, ENotificationType.error);
+                                Service.notify('Error', error.message, ENotificationType.error);
                             });
                         }).catch((err: Error) => {
-                            Service.notify('Error', `Fail to stop spy on port ${this.port.path}: ${err.message}`, ENotificationType.error);
+                            Service.notify('Error', err.message, ENotificationType.error);
                         });
                     },
                     onDisconnect: () => {
@@ -297,13 +289,14 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
                                 if (cSessionPort) {
                                     cSessionPort.spying = true;
                                     cSessionPort.read = 0;
+                                    cSessionPort.connected = this._ng_isConnected;
                                 } else {
                                     console.error('Something went wrong with the SessionPort entry');
                                 }
                             });
                             Service.removePopup();
                         }).catch((error: Error) => {
-                            Service.notify('Error', `Fail to close port ${this.port.path}: ${error.message}`, ENotificationType.error);
+                            Service.notify('Error', error.message, ENotificationType.error);
                         });
                     },
                     onReconnect: (portOptions: IOptions) => {
@@ -311,7 +304,11 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
                             Service.connect(portOptions).then(() => {
                                 this._options = portOptions;
                                 Service.removePopup();
+                            }).catch((error: Error) => {
+                                Service.notify('Error', error.message, ENotificationType.error);
                             });
+                        }).catch((error: Error) => {
+                            Service.notify('Error', error.message, ENotificationType.error);
                         });
                     }
                 }

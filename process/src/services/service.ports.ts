@@ -248,6 +248,7 @@ class ServicePorts {
                 connections: this._getConnectionsCount(controller.getPath()),
                 ioState: controller.getIOState()
             };
+            controller.clearIOState();
         });
         if (Object.keys(this._connectedPortsState.state).length === 0) {
             return;
@@ -274,7 +275,6 @@ class ServicePorts {
             if (controller === undefined) {
                 return;
             }
-            controller.setSignature(ports.length > 1 ? true : false);
         });
     }
 

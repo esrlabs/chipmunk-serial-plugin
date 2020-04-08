@@ -20,6 +20,7 @@ export class Service extends Toolkit.APluginService {
 
     public state:  {[port: string]: IPortState} = {};
     public sessionPort: {[session: string]: {[port: string]: IPort}} = {};
+    public chart_label_limit = 30;
 
     private _api: Toolkit.IAPI | undefined;
     private _session: string;
