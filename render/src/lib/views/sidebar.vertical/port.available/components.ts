@@ -1,6 +1,6 @@
 // tslint:disable:no-inferrable-types
 
-import { Component, OnDestroy, Input, AfterViewInit, ViewChildren, QueryList, ElementRef, ChangeDetectorRef, OnInit } from '@angular/core';
+import { Component, OnDestroy, Input, AfterViewInit, ViewChild, ElementRef, ChangeDetectorRef, OnInit } from '@angular/core';
 import { IPortInfo } from '../../../common/interface.portinfo';
 import Chart from 'chart.js';
 import { Subscription, Subject } from 'rxjs';
@@ -9,13 +9,6 @@ import { EHostEvents } from '../../../common/host.events';
 import { SidebarVerticalPortDialogComponent } from '../port.options/component';
 import { IOptions, CDefaultOptions } from '../../../common/interface.options';
 import { ENotificationType } from 'chipmunk.client.toolkit';
-
-interface Irgb {
-    red: number;
-    green: number;
-    blue: number;
-    opacity: number;
-}
 
 const LIMIT = 500;
 
@@ -29,11 +22,9 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
 
     @Input() port: IPortInfo;
     @Input() observables: {tick: Subject<boolean>, resize: Subject<{ sidebar_width: number, sidebar_height: number }>};
-
-    @ViewChildren('canvas') canvases: QueryList<ElementRef>;
+    @ViewChild('canvas') canvas: ElementRef<HTMLCanvasElement>;
 
     private _subscriptions: { [key: string]: Subscription } = {};
-    private _canvas: ElementRef<HTMLCanvasElement>;
     private _ctx: any;
     private _read: number = 0;
     private _chart: Chart;
@@ -52,34 +43,7 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
     ngAfterViewInit() {
         this._createChart();
         this._loadSession();
-        this._subscriptions.Subscription = this.observables.tick.subscribe((tick: boolean) => {
-            if (tick) {
-                this._update();
-            }
-            this._forceUpdate();
-        });
-
-        this._subscriptions.Subscription = this.observables.resize.subscribe((size: any) => {
-
-            this._sidebar_width = size.sidebar_width;
-            Service.chart_limit = Math.ceil(this._sidebar_width / 10);
-            this._chart.config.data.labels = this._chart_labels.slice(0, Service.chart_limit);
-
-            const cSessionPort = this._getSessionPort();
-            if (cSessionPort) {
-                this._chart.config.data.datasets[0].data = cSessionPort.sparkline_data.slice(0, Service.chart_limit + 1);
-            } else {
-                console.error('Something went wrong while loading the session');
-            }
-        });
-
-        this._subscriptions.Subscription = Service.getObservable().event.subscribe((message: any) => {
-            if (message.event === EHostEvents.spyState && message.load[this.port.path]) {
-                this._read = message.load[this.port.path];
-            } else if (message.event === EHostEvents.state && message.state[this.port.path]) {
-                this._read = message.state[this.port.path].ioState.read;
-            }
-        });
+        this._subscribe();
     }
 
     ngOnInit() {
@@ -92,10 +56,7 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
             this._chart.destroy();
             this._chart = undefined;
         }
-
-        Object.keys(this._subscriptions).forEach((key: string) => {
-            this._subscriptions[key].unsubscribe();
-        });
+        this._unsubscribe();
         this._destroyed = true;
     }
 
@@ -104,6 +65,53 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
             return;
         }
         this._cdRef.detectChanges();
+    }
+
+    private _subscribe() {
+        this._subscribeToTick('tick');
+        this._subscribeToResize('resize');
+        this._subscribeToEvent('event');
+    }
+
+    private _subscribeToTick(key: string) {
+        this._subscriptions[key] = this.observables.tick.subscribe((tick: boolean) => {
+            if (tick) {
+                this._update();
+            }
+            this._forceUpdate();
+        });
+    }
+
+    private _subscribeToResize(key: string) {
+        this._subscriptions[key] = this.observables.resize.subscribe((size: any) => {
+
+            this._sidebar_width = size.sidebar_width;
+            Service.chart_limit = Math.ceil(this._sidebar_width / 10);
+            this._chart.config.data.labels = this._chart_labels.slice(0, Service.chart_limit);
+
+            const cSessionPort = this._getSessionPort();
+            if (cSessionPort) {
+                this._chart.config.data.datasets[0].data = cSessionPort.sparkline_data.slice(0, Service.chart_limit + 1);
+            } else {
+                console.error('Something went wrong while loading the session');
+            }
+        });
+    }
+
+    private _subscribeToEvent(key: string) {
+        this._subscriptions[key] = Service.getObservable().event.subscribe((message: any) => {
+            if (message.event === EHostEvents.spyState && message.load[this.port.path]) {
+                this._read = message.load[this.port.path];
+            } else if (message.event === EHostEvents.state && message.state[this.port.path]) {
+                this._read = message.state[this.port.path].ioState.read;
+            }
+        });
+    }
+
+    private _unsubscribe() {
+        Object.keys(this._subscriptions).forEach((key: string) => {
+            this._subscriptions[key].unsubscribe();
+        });
     }
 
     private _loadSession() {
@@ -141,9 +149,7 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
     }
 
     private _createChart() {
-        this._canvas = this.canvases.find(canvas => canvas.nativeElement.id === `canvas_${this.port.path}`);
-        this._ctx = this._canvas.nativeElement.getContext('2d');
-
+        this._ctx = this.canvas.nativeElement.getContext('2d');
         const cSessionPort = this._getSessionPort();
         if (cSessionPort) {
             const cSparklineData = cSessionPort.sparkline_data;
@@ -153,7 +159,7 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
                     labels: this._chart_labels.slice(0, Service.chart_limit),
                     datasets: [{
                         data: cSparklineData.slice(cSparklineData.length - Service.chart_limit),
-                        borderColor: Service.portColor[this.port.path],
+                        borderColor: Service.getPortColor(this.port.path),
                         pointRadius: 0,
                         fill: false,
                     }]
