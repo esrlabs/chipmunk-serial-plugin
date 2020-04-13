@@ -21,7 +21,6 @@ export class Service extends Toolkit.APluginService {
 
     public state:  {[port: string]: IPortState} = {};
     public sessionPort: {[session: string]: {[port: string]: IPort}} = {};
-    public portColor: {[path: string]: string} = {};
     public chart_limit = 30;
 
     private _api: Toolkit.IAPI | undefined;
@@ -34,6 +33,7 @@ export class Service extends Toolkit.APluginService {
     private _subjects = {
         event: new Subject<any>(),
     };
+    private _portColor: {[path: string]: string} = {};
 
     constructor() {
         super();
@@ -71,7 +71,7 @@ export class Service extends Toolkit.APluginService {
             this.sessionPort[this._session] = {};
         }
         this.requestPorts().then(resolve => {
-            this._setColor(resolve.ports);
+            this._setPortColor(resolve.ports);
             resolve.ports.forEach((port: IPortInfo) => {
                 if (this.sessionPort[this._session][port.path] === undefined) {
                     this.sessionPort[this._session][port.path] = {
@@ -97,14 +97,18 @@ export class Service extends Toolkit.APluginService {
         }
     }
 
-    private _setColor(ports: IPortInfo[]) {
+    private _setPortColor(ports: IPortInfo[]) {
         ports.forEach((port: IPortInfo) => {
-            if (this.portColor[port.path] === undefined) {
+            if (this._portColor[port.path] === undefined) {
                 const cDirtyPath = '\u0004' + port.path + '\u0004';
                 const cSignature = ServiceSignatures.getSignature(cDirtyPath);
-                this.portColor[port.path] = cSignature.color;
+                this._portColor[port.path] = cSignature.color;
             }
         });
+    }
+
+    public getPortColor(path: string): string | undefined {
+        return this._portColor[path];
     }
 
     public getObservable(): {
