@@ -6,9 +6,12 @@
             <p>{{port.path}}</p>
             <p class="size t-small color-scheme-2">{{_ng_read()}}</p>
         </div>
-        <mat-icon (click)="_ng_onOptions()">settings</mat-icon>
+        <mat-icon (click)="_ng_isAvailable ? _ng_onOptions() : _ng_onWarning()">settings</mat-icon>
     </div>
-    <div class="canvas">
+    <div *ngIf="!_ng_isAvailable">
+        <mat-icon>not_interested</mat-icon>
+    </div>
+    <div *ngIf="_ng_isAvailable" class="canvas">
         <div class="holder">
             <canvas #canvas [attr.id]="'canvas_' + port.path"></canvas>
         </div>

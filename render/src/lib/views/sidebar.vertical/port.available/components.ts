@@ -9,6 +9,7 @@ import { EHostEvents } from '../../../common/host.events';
 import { SidebarVerticalPortDialogComponent } from '../port.options/component';
 import { IOptions, CDefaultOptions } from '../../../common/interface.options';
 import { ENotificationType } from 'chipmunk.client.toolkit';
+import { SidebarVerticalPortWarningComponent } from '../port.warning/component';
 
 const LIMIT = 500;
 
@@ -35,20 +36,24 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
     private _sidebar_width: number;
     private _session: string;
 
+    public _ng_isAvailable: boolean;
     public _ng_isConnected: boolean = false;
 
     constructor(private _cdRef: ChangeDetectorRef) {
     }
 
     ngAfterViewInit() {
-        this._createChart();
-        this._loadSession();
+        if (Service.getPortAvailable(this.port.path)) {
+            this._createChart();
+            this._loadSession();
+        }
         this._subscribe();
     }
 
     ngOnInit() {
         this._session = Service.getSessionID();
         this._defaultOptions.path = this.port.path;
+        this._ng_isAvailable = Service.getPortAvailable(this.port.path);
     }
 
     ngOnDestroy() {
@@ -68,8 +73,10 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
     }
 
     private _subscribe() {
-        this._subscribeToTick('tick');
-        this._subscribeToResize('resize');
+        if (Service.getPortAvailable(this.port.path)) {
+            this._subscribeToTick('tick');
+            this._subscribeToResize('resize');
+        }
         this._subscribeToEvent('event');
     }
 
@@ -125,9 +132,14 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
             if (cSessionPort.spying === false) {
                 Service.startSpy([this._defaultOptions]).then(() => {
                     cSessionPort.spying = true;
+                    Service.setPortAvailable(this.port.path, true);
+                    this._ng_isAvailable = true;
                 }).catch((error: Error) => {
-                    Service.notify('Error', error.message, ENotificationType.error);
+                    Service.setPortAvailable(this.port.path, false);
+                    this._ng_isAvailable = false;
+                    console.error(error.message);
                 });
+                this._forceUpdate();
             }
         } else {
             console.error('Something went wrong while loading the session');
@@ -238,6 +250,18 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
         event.target.value = '';
     }
 
+    public _ng_onWarning() {
+        Service.addPopup({
+            caption: `Error while accessing ${this.port.path}`,
+            component: {
+                factory: SidebarVerticalPortWarningComponent,
+                inputs: {
+                    port: this.port
+                }
+            }
+        });
+    }
+
     public _ng_onOptions() {
         Service.addPopup({
             caption: 'Select options for' + this.port.path,
@@ -285,7 +309,14 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
                                 } else {
                                     console.error('Something went wrong with the SessionPort entry');
                                 }
+                                Service.setPortAvailable(this.port.path, true);
+                                this._ng_isAvailable = true;
+                            }).catch((error: Error) => {
+                                Service.setPortAvailable(this.port.path, false);
+                                this._ng_isAvailable = false;
+                                console.error(error.message);
                             });
+                            this._forceUpdate();
                             Service.removePopup();
                         }).catch((error: Error) => {
                             Service.notify('Error', error.message, ENotificationType.error);
