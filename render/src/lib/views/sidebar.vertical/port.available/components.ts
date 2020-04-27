@@ -137,7 +137,7 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
                 }).catch((error: Error) => {
                     Service.setPortAvailable(this.port.path, false);
                     this._ng_isAvailable = false;
-                    console.error(error.message);
+                    console.log(error.message);
                 });
                 this._forceUpdate();
             }
@@ -314,7 +314,7 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
                             }).catch((error: Error) => {
                                 Service.setPortAvailable(this.port.path, false);
                                 this._ng_isAvailable = false;
-                                console.error(error.message);
+                                console.log(error.message);
                             });
                             this._forceUpdate();
                             Service.removePopup();
