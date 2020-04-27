@@ -4,7 +4,7 @@ import { EHostCommands, EHostEvents } from '../common/host.events';
 import { IOptions } from '../common/interface.options';
 import { Observable, Subject } from 'rxjs';
 import { IPortState, IPortInfo } from '../common/interface.portinfo';
-import ServiceSignatures, { ISignature } from './service.signatures';
+import ServiceSignatures from './service.signatures';
 
 export interface IPort {
     connected: boolean;
@@ -13,6 +13,13 @@ export interface IPort {
     limit: number;
     sparkline_data: Array<number>;
     spying: boolean;
+}
+
+export interface IPortOther {
+    color?: string;
+    available?: boolean;
+    openQueue?: boolean;
+    messageQueue?: string[];
 }
 
 const LIMIT = 300;
@@ -27,13 +34,11 @@ export class Service extends Toolkit.APluginService {
     private _session: string;
     private _subscriptions: { [key: string]: Toolkit.Subscription } = {};
     private _logger: Toolkit.Logger = new Toolkit.Logger(`Plugin: serial: inj_output_bot:`);
-    private _openQueue: {[port: string]: boolean} = {};
-    private _messageQueue: {[port: string]: string[]} = {};
     private _popupGuid: string;
     private _subjects = {
         event: new Subject<any>(),
     };
-    private _portColor: {[path: string]: string} = {};
+    private _portOther: {[path: string]: IPortOther} = {};
 
     constructor() {
         super();
@@ -89,26 +94,47 @@ export class Service extends Toolkit.APluginService {
         });
     }
 
-    private _emptyQueue(port: string) {
-        if (this._messageQueue[port]) {
-            this._messageQueue[port].forEach((message) => {
-                this.sendMessage(message, port);
+    private _emptyQueue(path: string) {
+        if (this._portOther[path] && this._portOther[path].messageQueue) {
+            this._portOther[path].messageQueue.forEach((message) => {
+                this.sendMessage(message, path);
             });
         }
     }
 
     private _setPortColor(ports: IPortInfo[]) {
         ports.forEach((port: IPortInfo) => {
-            if (this._portColor[port.path] === undefined) {
-                const cDirtyPath = '\u0004' + port.path + '\u0004';
-                const cSignature = ServiceSignatures.getSignature(cDirtyPath);
-                this._portColor[port.path] = cSignature.color;
+            const cDirtyPath = '\u0004' + port.path + '\u0004';
+            const cSignature = ServiceSignatures.getSignature(cDirtyPath);
+            if (this._portOther[port.path] === undefined) {
+                this._portOther[port.path] = {};
             }
+            this._portOther[port.path].color = cSignature.color;
         });
     }
 
-    public getPortColor(path: string): string | undefined {
-        return this._portColor[path];
+    public getPortAvailable(path: string): boolean {
+        if (this._portOther[path] === undefined) {
+            this._portOther[path] = { available: true };
+        } else if (this._portOther[path].available === undefined) {
+            this._portOther[path].available = true;
+        }
+        return this._portOther[path].available;
+    }
+
+    public setPortAvailable(path: string, status: boolean) {
+        if (this._portOther[path] === undefined) {
+            this._portOther[path] = { available: status };
+        } else {
+            this._portOther[path].available = status;
+        }
+    }
+
+    public getPortColor(path: string): string {
+        if (this._portOther[path] && this._portOther[path].color) {
+            return this._portOther[path].color;
+        }
+        return 'rgb(255,255,255)';
     }
 
     public getObservable(): {
@@ -158,22 +184,28 @@ export class Service extends Toolkit.APluginService {
                 cSessionPort[options.path].connected = true;
                 cSessionPort[options.path].read = 0;
             }
-            this._openQueue[options.path] = true;
+            if (this._portOther[options.path] === undefined) {
+                this._portOther[options.path] = {};
+            }
+            this._portOther[options.path].openQueue = true;
             this._emptyQueue(options.path);
         }).catch((error: Error) => {
             this.notify('error', `Failed to connect to ${options.path}: ${error.message}`, ENotificationType.error);
         });
     }
 
-    public disconnect(port: string): Promise<any> {
+    public disconnect(path: string): Promise<any> {
         return this._api.getIPC().request({
             stream: this._session,
             command: EHostCommands.close,
-            path: port,
+            path: path,
         }, this._session).then(() => {
-            this._openQueue[port] = false;
+            if (this._portOther[path] === undefined) {
+                this._portOther[path] = {};
+            }
+            this._portOther[path].openQueue = false;
         }).catch((error: Error) => {
-            this.notify('error', `Failed to disconnect from ${port}: ${error.message}`, ENotificationType.error);
+            this.notify('error', `Failed to disconnect from ${path}: ${error.message}`, ENotificationType.error);
         });
     }
 
@@ -191,9 +223,7 @@ export class Service extends Toolkit.APluginService {
             stream: this._session,
             command: EHostCommands.spyStart,
             options: options,
-        }, this._session).catch((error: Error) => {
-            this.notify('error', `Failed to start spying on ports: ${error.message}`, ENotificationType.error);
-        });
+        }, this._session);
     }
 
     public stopSpy(options: IOptions[]): Promise<any> {
