@@ -198,6 +198,9 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
                     },
                     legend: {
                         display: false
+                    },
+                    tooltips: {
+                        enabled: false
                     }
                 }
             });
