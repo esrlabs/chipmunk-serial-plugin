@@ -1,15 +1,15 @@
 <div class="container">
     <div class="info">
         <div class="right">
-            <mat-icon *ngIf="_ng_isConnected">power</mat-icon>
-            <mat-icon *ngIf="!_ng_isConnected">power_off</mat-icon>
+            <div *ngIf="_ng_isAvailable">
+                <mat-icon *ngIf="_ng_isConnected">power</mat-icon>
+                <mat-icon *ngIf="!_ng_isConnected">power_off</mat-icon>
+            </div>
+            <mat-icon *ngIf="!_ng_isAvailable">not_interested</mat-icon>
             <p>{{port.path}}</p>
-            <p class="size t-small color-scheme-2">{{_ng_read()}}</p>
+            <p *ngIf="_ng_isAvailable" class="size t-small color-scheme-2">{{_ng_read()}}</p>
         </div>
         <mat-icon (click)="_ng_isAvailable ? _ng_onOptions() : _ng_onWarning()">settings</mat-icon>
-    </div>
-    <div *ngIf="!_ng_isAvailable">
-        <mat-icon>not_interested</mat-icon>
     </div>
     <div *ngIf="_ng_isAvailable" class="canvas">
         <div class="holder">
