@@ -226,14 +226,15 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
             return;
         }
         if (this._chart) {
-            const cSessionPort = this._getSessionPort();
-            if (cSessionPort) {
-                cSessionPort.read += this._read;
-                cSessionPort.sparkline_data.pop();
-                cSessionPort.sparkline_data.unshift(this._read);
-            } else {
-                this._logger.error('Something went wrong with the SessionPort entry');
-            }
+            Object.keys(Service.sessionPort).forEach((session: string) => {
+                if (Service.sessionPort[session][this.port.path]) {
+                    Service.sessionPort[session][this.port.path].read += this._read;
+                    Service.sessionPort[session][this.port.path].sparkline_data.pop();
+                    Service.sessionPort[session][this.port.path].sparkline_data.unshift(this._read);
+                } else {
+                    this._logger.error('Something went wrong with the SessionPort entry');
+                }
+            });
 
             const cData = this._chart.config.data.datasets[0].data;
             cData.pop();
