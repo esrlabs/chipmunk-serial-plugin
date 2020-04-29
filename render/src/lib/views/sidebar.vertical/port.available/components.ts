@@ -245,7 +245,11 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
     }
 
     public _ng_read(): string {
-        return this._formatLoad(Service.sessionPort[this._session][this.port.path].read);
+        if (Service.sessionPort[this._session] && Service.sessionPort[this._session][this.port.path]) {
+            return this._formatLoad(Service.sessionPort[this._session][this.port.path].read);
+        } else {
+            return '0 b';
+        }
     }
 
     public _ng_send(event: any) {
