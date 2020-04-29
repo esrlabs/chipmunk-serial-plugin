@@ -34,7 +34,7 @@ export class Service extends Toolkit.APluginService {
     private _session: string;
     private _subscriptions: { [key: string]: Toolkit.Subscription } = {};
     private _logger: Toolkit.Logger = new Toolkit.Logger(`Plugin: serial: inj_output_bot:`);
-    private _popupGuid: string;
+    private _popupGuid = '';
     private _subjects = {
         event: new Subject<any>(),
     };
@@ -75,9 +75,9 @@ export class Service extends Toolkit.APluginService {
         if (this.sessionPort[this._session] === undefined) {
             this.sessionPort[this._session] = {};
         }
-        this.requestPorts().then(resolve => {
-            this._setPortColor(resolve.ports);
-            resolve.ports.forEach((port: IPortInfo) => {
+        this.requestPorts().then((response) => {
+            this._setPortColor(response.ports);
+            response.ports.forEach((port: IPortInfo) => {
                 if (this.sessionPort[this._session][port.path] === undefined) {
                     this.sessionPort[this._session][port.path] = {
                         connected: false,
@@ -97,7 +97,9 @@ export class Service extends Toolkit.APluginService {
     private _emptyQueue(path: string) {
         if (this._portOther[path] && this._portOther[path].messageQueue) {
             this._portOther[path].messageQueue.forEach((message) => {
-                this.sendMessage(message, path);
+                this.sendMessage(message, path).catch((error: Error) => {
+                    this.notify('Error', `Fail to send message due to error: ${error.message}`, ENotificationType.error);
+                });
             });
         }
     }
@@ -138,7 +140,7 @@ export class Service extends Toolkit.APluginService {
     }
 
     public getObservable(): {
-        event: Observable<any>,
+        event: Observable<Function>,
     } {
         return {
             event: this._subjects.event.asObservable(),
@@ -281,9 +283,13 @@ export class Service extends Toolkit.APluginService {
 
     public removePopup() {
         this._api.removePopup(this._popupGuid);
+        this._popupGuid = '';
     }
 
     public addPopup(popup: IPopup) {
+        if (this._popupGuid) {
+            this.removePopup();
+        }
         this._popupGuid = this._api.addPopup(popup);
     }
 
