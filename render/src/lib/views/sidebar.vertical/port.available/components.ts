@@ -1,7 +1,8 @@
 // tslint:disable:no-inferrable-types
 
+import * as Toolkit from 'chipmunk.client.toolkit';
 import { Component, OnDestroy, Input, AfterViewInit, ViewChild, ElementRef, ChangeDetectorRef, OnInit } from '@angular/core';
-import { IPortInfo } from '../../../common/interface.portinfo';
+import { IPortInfo, IPortState } from '../../../common/interface.portinfo';
 import Chart from 'chart.js';
 import { Subscription, Subject } from 'rxjs';
 import Service, { IPort } from '../../../services/service';
@@ -12,6 +13,11 @@ import { ENotificationType } from 'chipmunk.client.toolkit';
 import { SidebarVerticalPortWarningComponent } from '../port.warning/component';
 
 const LIMIT = 500;
+
+interface ISize {
+    sidebar_width: number;
+    sidebar_height: number;
+}
 
 @Component({
     selector: 'lib-dia-port-available-com',
@@ -26,7 +32,6 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
     @ViewChild('canvas') canvas: ElementRef<HTMLCanvasElement>;
 
     private _subscriptions: { [key: string]: Subscription } = {};
-    private _ctx: any;
     private _read: number = 0;
     private _chart: Chart;
     private _chart_labels = new Array(LIMIT).fill('');
@@ -35,6 +40,7 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
     private _defaultOptions: IOptions = Object.assign({}, CDefaultOptions);
     private _sidebar_width: number;
     private _session: string;
+    private _logger: Toolkit.Logger = new Toolkit.Logger(`Plugin: serial: inj_output_bot:`);
 
     public _ng_isAvailable: boolean;
     public _ng_isConnected: boolean = false;
@@ -74,14 +80,14 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
 
     private _subscribe() {
         if (Service.getPortAvailable(this.port.path)) {
-            this._subscribeToTick('tick');
-            this._subscribeToResize('resize');
+            this._subscribeToTick();
+            this._subscribeToResize();
         }
-        this._subscribeToEvent('event');
+        this._subscribeToEvent();
     }
 
-    private _subscribeToTick(key: string) {
-        this._subscriptions[key] = this.observables.tick.subscribe((tick: boolean) => {
+    private _subscribeToTick() {
+        this._subscriptions['tick'] = this.observables.tick.subscribe((tick: boolean) => {
             if (tick) {
                 this._update();
             }
@@ -89,9 +95,8 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
         });
     }
 
-    private _subscribeToResize(key: string) {
-        this._subscriptions[key] = this.observables.resize.subscribe((size: any) => {
-
+    private _subscribeToResize() {
+        this._subscriptions['resize'] = this.observables.resize.subscribe((size: ISize) => {
             this._sidebar_width = size.sidebar_width;
             Service.chart_limit = Math.ceil(this._sidebar_width / 10);
             this._chart.config.data.labels = this._chart_labels.slice(0, Service.chart_limit);
@@ -100,13 +105,13 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
             if (cSessionPort) {
                 this._chart.config.data.datasets[0].data = cSessionPort.sparkline_data.slice(0, Service.chart_limit + 1);
             } else {
-                console.error('Something went wrong while loading the session');
+                this._logger.error('Something went wrong while loading the session');
             }
         });
     }
 
-    private _subscribeToEvent(key: string) {
-        this._subscriptions[key] = Service.getObservable().event.subscribe((message: any) => {
+    private _subscribeToEvent() {
+        this._subscriptions['event'] = Service.getObservable().event.subscribe((message: any) => {
             if (message.event === EHostEvents.spyState && message.load[this.port.path]) {
                 this._read = message.load[this.port.path];
             } else if (message.event === EHostEvents.state && message.state[this.port.path]) {
@@ -137,12 +142,12 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
                 }).catch((error: Error) => {
                     Service.setPortAvailable(this.port.path, false);
                     this._ng_isAvailable = false;
-                    console.log(error.message);
+                    this._logger.error(error.message);
                 });
                 this._forceUpdate();
             }
         } else {
-            console.error('Something went wrong while loading the session');
+            this._logger.error('Something went wrong while loading the session');
         }
     }
 
@@ -161,11 +166,10 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
     }
 
     private _createChart() {
-        this._ctx = this.canvas.nativeElement.getContext('2d');
         const cSessionPort = this._getSessionPort();
         if (cSessionPort) {
             const cSparklineData = cSessionPort.sparkline_data;
-            this._chart = new Chart(this._ctx, {
+            this._chart = new Chart(this.canvas.nativeElement.getContext('2d'), {
                 type: 'line',
                 data: {
                     labels: this._chart_labels.slice(0, Service.chart_limit),
@@ -205,11 +209,11 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
                 }
             });
         } else {
-            console.error('Something went wrong with the SessionPort entry');
+            this._logger.error('Something went wrong with the SessionPort entry');
         }
     }
 
-    private _getSessionPort(): IPort {
+    private _getSessionPort(): IPort | null {
         const cSessionPort = Service.sessionPort[this._session];
         if (cSessionPort && cSessionPort[this.port.path]) {
             return cSessionPort[this.port.path];
@@ -228,7 +232,7 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
                 cSessionPort.sparkline_data.pop();
                 cSessionPort.sparkline_data.unshift(this._read);
             } else {
-                console.error('Something went wrong with the SessionPort entry');
+                this._logger.error('Something went wrong with the SessionPort entry');
             }
 
             const cData = this._chart.config.data.datasets[0].data;
@@ -290,7 +294,7 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
                                     cSessionPort.spying = false;
                                     cSessionPort.read = 0;
                                 } else {
-                                    console.error('Something went wrong with the SessionPort entry');
+                                    this._logger.error('Something went wrong with the SessionPort entry');
                                 }
                                 Service.removePopup();
                             }).catch((error: Error) => {
@@ -310,14 +314,14 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
                                     cSessionPort.read = 0;
                                     cSessionPort.connected = this._ng_isConnected;
                                 } else {
-                                    console.error('Something went wrong with the SessionPort entry');
+                                    this._logger.error('Something went wrong with the SessionPort entry');
                                 }
                                 Service.setPortAvailable(this.port.path, true);
                                 this._ng_isAvailable = true;
                             }).catch((error: Error) => {
                                 Service.setPortAvailable(this.port.path, false);
                                 this._ng_isAvailable = false;
-                                console.log(error.message);
+                                this._logger.error(error.message);
                             });
                             this._forceUpdate();
                             Service.removePopup();
