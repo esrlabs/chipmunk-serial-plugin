@@ -22,13 +22,7 @@ export interface IPortOther {
     messageQueue?: string[];
 }
 
-const LIMIT = 300;
-
 export class Service extends Toolkit.APluginService {
-
-    public state:  {[port: string]: IPortState} = {};
-    public sessionPort: {[session: string]: {[port: string]: IPort}} = {};
-    public chart_limit = 30;
 
     private _api: Toolkit.IAPI | undefined;
     private _session: string;
@@ -38,7 +32,11 @@ export class Service extends Toolkit.APluginService {
     private _subjects = {
         event: new Subject<any>(),
     };
+    private _sessionPort: {[session: string]: {[port: string]: IPort}} = {};
     private _portOther: {[path: string]: IPortOther} = {};
+    private _chartLimit = 30;
+    private _limit = 300;
+    private _sessions: string[] = [];
 
     constructor() {
         super();
@@ -59,32 +57,37 @@ export class Service extends Toolkit.APluginService {
 
     private _onSessionOpen() {
         this._session = this._api.getActiveSessionId();
+        this._sessions.push(this._session);
         this._createSessionEntries();
         this.incomeMessage();
     }
 
-    private _onSessionClose(guid: string) {
-        delete this.sessionPort[guid];
+    private _onSessionClose(session: string) {
+        const INDEX = this._sessions.indexOf(session);
+        if (INDEX !== -1) {
+            this._sessions.splice(INDEX);
+        }
+        this.deleteSessionEntry(session);
     }
 
-    private _onSessionChange(guid: string) {
-        this._session = guid;
+    private _onSessionChange(session: string) {
+        this._session = session;
     }
 
     private _createSessionEntries() {
-        if (this.sessionPort[this._session] === undefined) {
-            this.sessionPort[this._session] = {};
+        if (this._sessionPort[this._session] === undefined) {
+            this._sessionPort[this._session] = {};
         }
         this.requestPorts().then((response) => {
             this._setPortColor(response.ports);
             response.ports.forEach((port: IPortInfo) => {
-                if (this.sessionPort[this._session][port.path] === undefined) {
-                    this.sessionPort[this._session][port.path] = {
+                if (this.getSessionPort(this._session, port.path) === undefined) {
+                    this._sessionPort[this._session][port.path] = {
                         connected: false,
                         read: 0,
                         written: 0,
                         limit: 30,
-                        sparkline_data: new Array<number>(LIMIT),
+                        sparkline_data: new Array<number>(this._limit),
                         spying: false
                     };
                 }
@@ -156,15 +159,15 @@ export class Service extends Toolkit.APluginService {
                 return;
             }
             if (message.event === EHostEvents.spyState || message.event === EHostEvents.state) {
-                Object.keys(this.sessionPort).forEach((session: string) => {
-                    Object.keys(this.sessionPort[session]).forEach((path: string) => {
-                        this.sessionPort[session][path].sparkline_data.shift();
+                Object.keys(this._sessionPort).forEach((session: string) => {
+                    Object.keys(this._sessionPort[session]).forEach((path: string) => {
+                        this._sessionPort[session][path].sparkline_data.shift();
                         if (message.event === EHostEvents.state && message.state[path]) {
-                            this.sessionPort[session][path].read += message.state[path].ioState.read;
-                            this.sessionPort[session][path].sparkline_data.push(message.state[path].ioState.read);
+                            this._sessionPort[session][path].read += message.state[path].ioState.read;
+                            this._sessionPort[session][path].sparkline_data.push(message.state[path].ioState.read);
                         } else if (message.event === EHostEvents.spyState && message.load[path]) {
-                            this.sessionPort[session][path].read += message.load[path];
-                            this.sessionPort[session][path].sparkline_data.push(message.load[path]);
+                            this._sessionPort[session][path].read += message.load[path];
+                            this._sessionPort[session][path].sparkline_data.push(message.load[path]);
                         }
                     });
                 });
@@ -181,7 +184,7 @@ export class Service extends Toolkit.APluginService {
         }, this._session).then(() => {
             this.writeConfig(options);
 
-            const cSessionPort = this.sessionPort[this._session];
+            const cSessionPort = this._sessionPort[this._session];
             if (cSessionPort !== undefined && cSessionPort[options.path]) {
                 cSessionPort[options.path].connected = true;
                 cSessionPort[options.path].read = 0;
@@ -316,6 +319,85 @@ export class Service extends Toolkit.APluginService {
 
     public getSessionID(): string {
         return this._session;
+    }
+
+    public getChartLimit(): number {
+        return this._chartLimit;
+    }
+
+    public setChartLimit(limit: number) {
+        if (typeof limit !== 'number' || limit < 0) {
+            this._logger.warn('There seems to be an issue with the chart limit');
+            return;
+        }
+        this._chartLimit = limit;
+    }
+
+    private _check(session?: string, path?: string, read?: number): number {
+        if (session && (typeof session !== 'string' || session.trim() === '')) {
+            this._logger.warn('Wrong session format when accessing sessionPort!');
+            return 1;
+        }
+        if (path && (typeof path !== 'string' || path.trim() === '')) {
+            this._logger.warn('Wrong path format when accessing sessionPort!');
+            return 1;
+        }
+        if (read && typeof read !== 'number') {
+            this._logger.warn('Wrong format for read');
+            return 1;
+        }
+        if (this._sessionPort[session] === undefined || this._sessionPort[session][path] === undefined) {
+            this._logger.warn(`The session ${session} has no entry for ${path} in sessionPort!`);
+            return 1;
+        }
+        return 0;
+    }
+
+    public getSessionPort(session: string, path: string): IPort | undefined {
+        if (this._check(session, path) === 1) {
+            return undefined;
+        }
+        return Object.assign({}, this._sessionPort[session][path]);
+    }
+
+    public setSessionPortRead(session: string, path: string, read: number) {
+        if (this._check(session, path) === 1) {
+            return;
+        }
+        if (this._sessionPort[session][path].read === undefined) {
+            this._sessionPort[session][path].read = 0;
+        }
+        this._sessionPort[session][path].read += read;
+    }
+
+    public updateSparkline(session: string, path: string, read: number) {
+        if (this._check(session, path, read) === 1) {
+            return;
+        }
+        if (this._sessionPort[session][path].sparkline_data === undefined) {
+            this._logger.warn(`The session ${session} has no sparkline data for the port ${path} stored!`);
+            return;
+        }
+        this._sessionPort[session][path].sparkline_data.pop();
+        this._sessionPort[session][path].sparkline_data.unshift(read);
+    }
+
+    public deleteSessionEntry(session: string) {
+        if (this._check(session) === 1) {
+            return;
+        }
+        delete this._sessionPort[session];
+    }
+
+    public deletePortEntry(session: string, path: string) {
+        if (this._check(session, path) === 1) {
+            return;
+        }
+        delete this._sessionPort[session][path];
+    }
+
+    public getSessions(): string[] | undefined {
+        return this._sessions;
     }
 }
 
