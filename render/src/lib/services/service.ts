@@ -65,7 +65,11 @@ export class Service extends Toolkit.APluginService {
 
     private _onSessionOpen() {
         this._session = this._api.getActiveSessionId();
-        this._sessions.push(this._session);
+        if (this._session !== undefined) {
+            this._sessions.push(this._session);
+        } else {
+            this._session = '*';
+        }
         this._createSessionEntries();
         this.incomeMessage();
     }
