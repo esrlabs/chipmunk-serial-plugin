@@ -2,10 +2,10 @@
 
 import * as Toolkit from 'chipmunk.client.toolkit';
 import { Component, OnDestroy, Input, AfterViewInit, ViewChild, ElementRef, ChangeDetectorRef, OnInit } from '@angular/core';
-import { IPortInfo, IPortState } from '../../../common/interface.portinfo';
+import { IPortInfo } from '../../../common/interface.portinfo';
 import Chart from 'chart.js';
 import { Subscription, Subject } from 'rxjs';
-import Service, { IPort } from '../../../services/service';
+import Service from '../../../services/service';
 import { EHostEvents } from '../../../common/host.events';
 import { SidebarVerticalPortDialogComponent } from '../port.options/component';
 import { IOptions, CDefaultOptions } from '../../../common/interface.options';
@@ -53,6 +53,7 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
             this._loadSession();
         }
         this._subscribe();
+        this._options = Service.getSettings(this.port.path);
     }
 
     ngOnInit() {
@@ -263,7 +264,7 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
 
     public _ng_onOptions() {
         Service.addPopup({
-            caption: 'Select options for' + this.port.path,
+            caption: 'Select options for ' + this.port.path,
             component: {
                 factory: SidebarVerticalPortDialogComponent,
                 inputs: {
@@ -272,6 +273,7 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
                     options: this._options,
                     onConnect: (portOptions: IOptions) => {
                         if (this._ng_isConnected) {
+                            this._logger.error(`The port ${portOptions.path} is already connected!`);
                             return;
                         }
                         Service.stopSpy([this._defaultOptions]).then(() => {
