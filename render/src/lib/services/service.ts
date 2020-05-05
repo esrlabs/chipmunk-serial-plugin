@@ -30,6 +30,10 @@ enum EValidationError {
     NOT_VALID_ENTRY = 1003
 }
 
+export interface IPortConfig {
+    settings: {[path: string]: IOptions};
+}
+
 export class Service extends Toolkit.APluginService {
 
     private _api: Toolkit.IAPI | undefined;
@@ -45,6 +49,8 @@ export class Service extends Toolkit.APluginService {
     private _chartLimit = 30;
     private _limit = 300;
     private _sessions: string[] = [];
+    private _configuration: IPortConfig;
+    private _configSettings: {[path: string]: IOptions};
 
     constructor() {
         super();
@@ -70,7 +76,15 @@ export class Service extends Toolkit.APluginService {
         } else {
             this._session = '*';
         }
-        this._createSessionEntries();
+        this.readConfig().then((configuration: IPortConfig | undefined) => {
+            if (configuration !== undefined && configuration.settings !== undefined) {
+                this._configuration = configuration;
+                this._configSettings = configuration.settings;
+            }
+            this._createSessionEntries();
+        }).catch((error: Error) => {
+            this._logger.warn(`An error occured when reading the configuration file: ${error.message}`);
+        });
         this.incomeMessage();
     }
 
@@ -410,6 +424,13 @@ export class Service extends Toolkit.APluginService {
 
     public getSessions(): string[] | undefined {
         return this._sessions;
+    }
+
+    public getSettings(path: string): IOptions | undefined {
+        if (this._configSettings && this._configSettings[path]) {
+            return Object.assign(this._configSettings[path]);
+        }
+        return undefined;
     }
 }
 
