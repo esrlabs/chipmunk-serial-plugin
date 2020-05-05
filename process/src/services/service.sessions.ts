@@ -32,12 +32,18 @@ interface IOptions {
     };
 }
 
-interface IRecentPortData {
+interface IPortConfig {
     [port: string]: IOptions;
 };
 
 interface IPluginSettings {
-    recent: IRecentPortData;
+    recent: IPortConfig;
+    commands: string[];
+}
+
+enum EType {
+    command = 'command',
+    options = 'options'
 }
 
 class ServiceSessions {
@@ -52,7 +58,7 @@ class ServiceSessions {
         PluginIPCService.subscribe(IPCMessages.PluginInternalMessage, this._onIncomeRenderIPCMessage);
         PluginIPCService.on(PluginIPCService.Events.openStream, this._onOpenStream);
         PluginIPCService.on(PluginIPCService.Events.closeStream, this._onCloseStream);
-        ServiceConfig.setDefault<IPluginSettings>( { recent: {} } );
+        ServiceConfig.setDefault<IPluginSettings>( { recent: {}, commands: [] } );
     }
 
     public destroy(): Promise<void> {
@@ -211,7 +217,7 @@ class ServiceSessions {
                     }));
                 });
             case ECommands.read:
-                return this._income_onReadConfig(message).then((settings: IRecentPortData) => {
+                return this._income_onReadConfig(message).then((settings: IPluginSettings) => {
                     response(new IPCMessages.PluginInternalMessage({
                         data: {
                             settings: settings
@@ -415,23 +421,40 @@ class ServiceSessions {
             if (message === undefined) {
                 return reject(new Error(this._logger.error(`Fail to save configuration, because message is undefined`)));
             }
-            this._updateConfig(message.data.options).then((settings: {}) => {
-                ServiceConfig.write(settings).then(() => {
-                    resolve();
-                }).catch((error: Error) => {
-                    reject(error);
-                });
-            }).catch((error: Error) => {
-                this._logger.error(`Failed to save configurations due error: ${error.message}`);
-                return reject(error);
-            });
+            if (message.data && message.data.data) {
+                if (message.data.type === EType.command) {
+                    this._addCommand(message.data.data).then((settings: {}) => {
+                        ServiceConfig.write(settings).then(() => {
+                            resolve();
+                        }).catch((error: Error) => {
+                            reject(error);
+                        });
+                    }).catch((error: Error) => {
+                        this._logger.error(`Failed to save configurations due error: ${error.message}`);
+                        return reject(error);
+                    });
+                } else if (message.data.type === EType.options) {
+                    this._addOptions(message.data.data).then((settings: {}) => {
+                        ServiceConfig.write(settings).then(() => {
+                            resolve();
+                        }).catch((error: Error) => {
+                            reject(error);
+                        });
+                    }).catch((error: Error) => {
+                        this._logger.error(`Failed to save configurations due error: ${error.message}`);
+                        return reject(error);
+                    });
+                } else {
+                    return reject(new Error(this._logger.error(`Fail to save configuration, because of an unknown data type: ${message.data.type}`)));
+                }
+            }
         });
     }
 
-    private _income_onReadConfig(message: IPCMessages.PluginInternalMessage): Promise<IRecentPortData> {
+    private _income_onReadConfig(message: IPCMessages.PluginInternalMessage): Promise<IPluginSettings> {
         return new Promise((resolve, reject) => {
-            ServiceConfig.read<IPluginSettings>().then(settings => {
-                resolve(settings.recent);
+            ServiceConfig.read<IPluginSettings>().then((settings: IPluginSettings) => {
+                resolve(settings);
             }).catch((error: Error) => {
                 this._logger.error(`Failed to load configurations due error: ${error.message}`);
                 reject(error);
@@ -441,35 +464,65 @@ class ServiceSessions {
 
     private _income_onRemoveConfig(message: IPCMessages.PluginInternalMessage): Promise<void> {
         return new Promise((resolve, reject) => {
-            ServiceConfig.read<IPluginSettings>().then((settings: IPluginSettings) => {
-                if (!settings.recent || Object.keys(settings.recent).length === 0) {
-                    return;
-                }
-                if (message.data.port === '*') {
-                    Object.keys(settings.recent).forEach((port: string) => {
-                        delete settings.recent[port];
+            if (message === undefined) {
+                return reject(new Error(this._logger.error(`Fail to remove configuration, because message is undefined`)));
+            }
+            if (message.data && message.data.data) {
+                ServiceConfig.read<IPluginSettings>().then((settings: IPluginSettings) => {
+                    if (message.data.type === EType.command) {
+                        if (settings.commands === undefined || settings.commands.length === 0) {
+                            return;
+                        }
+                        const INDEX = settings.commands.indexOf(message.data.data);
+                        if (INDEX === -1) {
+                            return;
+                        }
+                        settings.commands.splice(INDEX, 1);
+                    } else if (message.data.type === EType.options) {
+                        if (settings.recent === undefined || Object.keys(settings.recent).length === 0) {
+                            return;
+                        }
+                        delete settings.recent[message.data.port];
+                    } else {
+                        return;
+                    }
+                    ServiceConfig.write(settings).then(() => {
+                        resolve();
+                    }).catch((error: Error) => {
+                        return reject(error);
                     });
-                } else {
-                    delete settings.recent[message.data.port];
-                }
-                ServiceConfig.write(settings).then(() => {
-                    resolve();
                 }).catch((error: Error) => {
-                    return reject(error);
+                    this._logger.error(`Failed to remove settings due to error: ${error.message}`);
                 });
+            }
+        });
+    }
+
+    private _addOptions(options: IOptions): Promise<{}> {
+        return new Promise((resolve, reject)=> {
+            ServiceConfig.read<IPluginSettings>().then((settings: IPluginSettings) => {
+                if (settings.recent === undefined) {
+                    settings.recent = {};
+                }
+                if (options) {
+                    settings.recent[options.path] = options;
+                }
+                resolve(settings);
             }).catch((error: Error) => {
-                this._logger.error(`Failed to remove settings due to error: ${error.message}`);
+                reject(error);
             });
         });
     }
 
-    private _updateConfig(options: IOptions): Promise<{}> {
+    private _addCommand(command: string): Promise<{}> {
         return new Promise((resolve, reject)=> {
             ServiceConfig.read<IPluginSettings>().then((settings: IPluginSettings) => {
-                if (!settings.recent) {
-                    settings.recent = {};
+                if (settings.commands === undefined) {
+                    settings.commands = [];
                 }
-                settings.recent[options.path] = options;
+                if (command !== undefined && command.trim() !== '' && settings.commands.indexOf(command) === -1) {
+                    settings.commands.push(command);
+                }
                 resolve(settings);
             }).catch((error: Error) => {
                 reject(error);
