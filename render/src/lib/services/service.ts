@@ -22,6 +22,14 @@ export interface IPortOther {
     messageQueue?: string[];
 }
 
+enum EValidationError {
+    NO_ERROR = 0,
+    NOT_VALID_SESSION = 1000,
+    NOT_VALID_PATH = 1001,
+    NOT_VALID_READ = 1002,
+    NOT_VALID_ENTRY = 1003
+}
+
 export class Service extends Toolkit.APluginService {
 
     private _api: Toolkit.IAPI | undefined;
@@ -333,35 +341,35 @@ export class Service extends Toolkit.APluginService {
         this._chartLimit = limit;
     }
 
-    private _check(session?: string, path?: string, read?: number): number {
+    private _check(session?: string, path?: string, read?: number): EValidationError {
         if (session && (typeof session !== 'string' || session.trim() === '')) {
             this._logger.warn('Wrong session format when accessing sessionPort!');
-            return 1;
+            return EValidationError.NOT_VALID_SESSION;
         }
         if (path && (typeof path !== 'string' || path.trim() === '')) {
             this._logger.warn('Wrong path format when accessing sessionPort!');
-            return 1;
+            return EValidationError.NOT_VALID_PATH;
         }
         if (read && typeof read !== 'number') {
             this._logger.warn('Wrong format for read');
-            return 1;
+            return EValidationError.NOT_VALID_READ;
         }
         if (this._sessionPort[session] === undefined || this._sessionPort[session][path] === undefined) {
             this._logger.warn(`The session ${session} has no entry for ${path} in sessionPort!`);
-            return 1;
+            return EValidationError.NOT_VALID_ENTRY;
         }
-        return 0;
+        return EValidationError.NO_ERROR;
     }
 
     public getSessionPort(session: string, path: string): IPort | undefined {
-        if (this._check(session, path) === 1) {
+        if (this._check(session, path) !== EValidationError.NO_ERROR) {
             return undefined;
         }
         return Object.assign({}, this._sessionPort[session][path]);
     }
 
     public setSessionPortRead(session: string, path: string, read: number) {
-        if (this._check(session, path) === 1) {
+        if (this._check(session, path, read) !== EValidationError.NO_ERROR) {
             return;
         }
         if (this._sessionPort[session][path].read === undefined) {
@@ -371,7 +379,7 @@ export class Service extends Toolkit.APluginService {
     }
 
     public updateSparkline(session: string, path: string, read: number) {
-        if (this._check(session, path, read) === 1) {
+        if (this._check(session, path, read) !== EValidationError.NO_ERROR) {
             return;
         }
         if (this._sessionPort[session][path].sparkline_data === undefined) {
@@ -383,14 +391,14 @@ export class Service extends Toolkit.APluginService {
     }
 
     public deleteSessionEntry(session: string) {
-        if (this._check(session) === 1) {
+        if (this._check(session) !== EValidationError.NO_ERROR) {
             return;
         }
         delete this._sessionPort[session];
     }
 
     public deletePortEntry(session: string, path: string) {
-        if (this._check(session, path) === 1) {
+        if (this._check(session, path) !== EValidationError.NO_ERROR) {
             return;
         }
         delete this._sessionPort[session][path];
