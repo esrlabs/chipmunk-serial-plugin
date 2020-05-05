@@ -214,7 +214,6 @@ class ServiceSessions {
                 return this._income_onReadConfig(message).then((settings: IRecentPortData) => {
                     response(new IPCMessages.PluginInternalMessage({
                         data: {
-                            status: 'done',
                             settings: settings
                         },
                         token: message.token,
