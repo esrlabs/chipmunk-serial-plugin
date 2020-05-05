@@ -43,6 +43,7 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
 
     public _ng_isAvailable: boolean;
     public _ng_isConnected: boolean = false;
+    public _ng_recent: string[];
 
     constructor(private _cdRef: ChangeDetectorRef) {
     }
@@ -54,6 +55,7 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
         }
         this._subscribe();
         this._options = Service.getSettings(this.port.path);
+        this._ng_recent = Service.getCommands();
     }
 
     ngOnInit() {

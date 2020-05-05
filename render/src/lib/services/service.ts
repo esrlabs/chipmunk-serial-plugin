@@ -3,7 +3,7 @@ import { IPopup, ENotificationType } from 'chipmunk.client.toolkit';
 import { EHostCommands, EHostEvents } from '../common/host.events';
 import { IOptions } from '../common/interface.options';
 import { Observable, Subject } from 'rxjs';
-import { IPortState, IPortInfo } from '../common/interface.portinfo';
+import { IPortInfo } from '../common/interface.portinfo';
 import ServiceSignatures from './service.signatures';
 
 export interface IPort {
@@ -30,6 +30,16 @@ enum EValidationError {
     NOT_VALID_ENTRY = 1003
 }
 
+interface IPluginSettings {
+    recent: IPortConfig;
+    commands: string[];
+}
+
+export enum EType {
+    command = 'command',
+    options = 'options'
+}
+
 export interface IPortConfig {
     settings: {[path: string]: IOptions};
 }
@@ -49,8 +59,8 @@ export class Service extends Toolkit.APluginService {
     private _chartLimit = 30;
     private _limit = 300;
     private _sessions: string[] = [];
-    private _configuration: IPortConfig;
     private _configSettings: {[path: string]: IOptions};
+    private _configCommands: string[];
 
     constructor() {
         super();
@@ -76,10 +86,14 @@ export class Service extends Toolkit.APluginService {
         } else {
             this._session = '*';
         }
-        this.readConfig().then((configuration: IPortConfig | undefined) => {
-            if (configuration !== undefined && configuration.settings !== undefined) {
-                this._configuration = configuration;
-                this._configSettings = configuration.settings;
+        this.readConfig().then((configuration: IPluginSettings) => {
+            if (configuration && configuration['settings']) {
+                if (configuration['settings'].recent) {
+                    this._configSettings = configuration['settings'].recent;
+                }
+                if (configuration['settings'].commands) {
+                    this._configCommands = configuration['settings'].commands;
+                }
             }
             this._createSessionEntries();
         }).catch((error: Error) => {
@@ -208,7 +222,7 @@ export class Service extends Toolkit.APluginService {
             command: EHostCommands.open,
             options: options,
         }, this._session).then(() => {
-            this.writeConfig(options);
+            this.writeConfig(EType.options, options);
 
             const cSessionPort = this._sessionPort[this._session];
             if (cSessionPort !== undefined && cSessionPort[options.path]) {
@@ -270,22 +284,25 @@ export class Service extends Toolkit.APluginService {
         return Promise.resolve();
     }
 
-    public sendMessage(message: string, port: string): Promise<any> {
+    public sendMessage(message: string, path: string): Promise<any> {
         return this._api.getIPC().request({
             stream: this._session,
             command: EHostCommands.send,
             cmd: message,
-            path: port
-        }, this._session).catch((error: Error) => {
+            path: path
+        }, this._session).then(() => {
+            this.writeConfig(EType.command, message);
+        }).catch((error: Error) => {
             this.notify('error', `Failed to send message to port: ${error.message}`, ENotificationType.error);
         });
     }
 
-    public writeConfig(options: IOptions): Promise<void> {
+    public writeConfig(type: EType, data: IOptions | string): Promise<void> {
         return this._api.getIPC().request({
             stream: this._session,
             command: EHostCommands.write,
-            options: options
+            type: type,
+            data: data
         }, this._session).catch((error: Error) => {
             this.notify('error', `Failed to write port configuration: ${error.message}`, ENotificationType.error);
         });
@@ -423,14 +440,21 @@ export class Service extends Toolkit.APluginService {
     }
 
     public getSessions(): string[] | undefined {
-        return this._sessions;
+        return Object.assign([], this._sessions);
     }
 
     public getSettings(path: string): IOptions | undefined {
         if (this._configSettings && this._configSettings[path]) {
-            return Object.assign(this._configSettings[path]);
+            return Object.assign({}, this._configSettings[path]);
         }
         return undefined;
+    }
+
+    public getCommands(): string[] {
+        if (this._configCommands) {
+            return Object.assign([], this._configCommands);
+        }
+        return [];
     }
 }
 
