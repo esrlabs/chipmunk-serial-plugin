@@ -13,7 +13,7 @@ import * as Toolkit from 'chipmunk.client.toolkit';
 
 export class SidebarVerticalPortOptionsReadComponent implements AfterViewInit, OnDestroy {
 
-    @Input() public options: IOptions;
+    @Input() public options: IOptions | undefined;
 
     private _subscriptions: { [key: string]: Toolkit.Subscription } = {};
     private _destroyed: boolean = false;

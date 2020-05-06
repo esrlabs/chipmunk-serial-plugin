@@ -17,7 +17,7 @@ export class SidebarVerticalPortDialogComponent implements AfterViewInit {
 
     @Input() isConnected: boolean;
     @Input() port: IPortInfo;
-    @Input() options: IOptions;
+    @Input() options: IOptions | undefined;
     @Input() onConnect: (portOptions: IOptions) => void;
     @Input() onDisconnect: () => void;
     @Input() onReconnect: (portOptions: IOptions) => void;
