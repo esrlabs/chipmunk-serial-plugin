@@ -23,6 +23,7 @@
                     placeholder="Type a command"
                     (keyup.enter)="_ng_send($event)"
                     aria-label="Filter"
+                    (focus)="_ng_loadCommands()"
                     [matAutocomplete]="auto">
             <mat-autocomplete #auto="matAutocomplete" class="regular"
                 [classList]="'recent-requests'"

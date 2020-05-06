@@ -59,8 +59,8 @@ export class Service extends Toolkit.APluginService {
     private _chartLimit = 30;
     private _limit = 300;
     private _sessions: string[] = [];
-    private _configSettings: {[path: string]: IOptions};
-    private _configCommands: string[];
+    private _configSettings: {[path: string]: IOptions} | undefined = {};
+    private _configCommands: string[] = [];
 
     constructor() {
         super();
@@ -291,6 +291,9 @@ export class Service extends Toolkit.APluginService {
             cmd: message,
             path: path
         }, this._session).then(() => {
+            if (this._configCommands.indexOf(message) === -1) {
+                this._configCommands.push(message);
+            }
             this.writeConfig(EType.command, message);
         }).catch((error: Error) => {
             this.notify('error', `Failed to send message to port: ${error.message}`, ENotificationType.error);
@@ -444,17 +447,14 @@ export class Service extends Toolkit.APluginService {
     }
 
     public getSettings(path: string): IOptions | undefined {
-        if (this._configSettings && this._configSettings[path]) {
+        if (this._configSettings !== undefined && this._configSettings[path] !== undefined) {
             return Object.assign({}, this._configSettings[path]);
         }
         return undefined;
     }
 
     public getCommands(): string[] {
-        if (this._configCommands) {
-            return Object.assign([], this._configCommands);
-        }
-        return [];
+        return this._configCommands.slice();
     }
 }
 

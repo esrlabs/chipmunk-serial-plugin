@@ -35,7 +35,7 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
     private _limit = 500;
     private _chart_labels = new Array(this._limit).fill('');
     private _destroyed: boolean = false;
-    private _options: IOptions;
+    private _options: IOptions | undefined;
     private _defaultOptions: IOptions = Object.assign({}, CDefaultOptions);
     private _sidebar_width: number;
     private _session: string;
@@ -54,8 +54,6 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
             this._loadSession();
         }
         this._subscribe();
-        this._options = Service.getSettings(this.port.path);
-        this._ng_recent = Service.getCommands();
     }
 
     ngOnInit() {
@@ -264,7 +262,12 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
         });
     }
 
+    public _ng_loadCommands() {
+        this._ng_recent = Service.getCommands();
+    }
+
     public _ng_onOptions() {
+        this._options = Service.getSettings(this.port.path);
         Service.addPopup({
             caption: 'Select options for ' + this.port.path,
             component: {
