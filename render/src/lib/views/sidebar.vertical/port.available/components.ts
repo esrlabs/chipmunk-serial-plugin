@@ -129,7 +129,6 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
 
     private _loadSession() {
         const cSessionPort = Service.getSessionPort(this._session, this.port.path);
-        this._chart.config.options.animation.duration = 5000;
         if (cSessionPort) {
             this._ng_isConnected = cSessionPort.connected;
             this._chart.config.data.datasets[0].data = cSessionPort.sparkline_data.slice(0, Service.getChartLimit() + 1);
@@ -184,7 +183,7 @@ export class DialogAvailablePortComponent implements OnDestroy, AfterViewInit, O
                 options: {
                     maintainAspectRatio: false,
                     animation: {
-                        duration: 0
+                        duration: 5000
                     },
                     scales: {
                         xAxes: [{
