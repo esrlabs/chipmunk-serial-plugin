@@ -95,7 +95,7 @@ export class Service extends Toolkit.APluginService {
                     this._configCommands = configuration['settings'].commands;
                 }
             }
-            this._createSessionEntries();
+            this._createSessionEntries(this._session);
         }).catch((error: Error) => {
             this._logger.warn(`An error occured when reading the configuration file: ${error.message}`);
         });
@@ -114,15 +114,15 @@ export class Service extends Toolkit.APluginService {
         this._session = session;
     }
 
-    private _createSessionEntries() {
-        if (this._sessionPort[this._session] === undefined) {
-            this._sessionPort[this._session] = {};
+    private _createSessionEntries(session: string) {
+        if (this._sessionPort[session] === undefined) {
+            this._sessionPort[session] = {};
         }
-        this.requestPorts().then((response) => {
+        this.requestPorts(session).then((response) => {
             this._setPortColor(response.ports);
             response.ports.forEach((port: IPortInfo) => {
-                if (this.getSessionPort(this._session, port.path) === undefined) {
-                    this._sessionPort[this._session][port.path] = {
+                if (this.getSessionPort(session, port.path) === undefined) {
+                    this._sessionPort[session][port.path] = {
                         connected: false,
                         read: 0,
                         written: 0,
@@ -254,11 +254,14 @@ export class Service extends Toolkit.APluginService {
         });
     }
 
-    public requestPorts(): Promise<any> {
+    public requestPorts(session?: string): Promise<any> {
+        if (session === undefined) {
+            session = this._session;
+        }
         return this._api.getIPC().request({
-            stream: this._session,
+            stream: session,
             command: EHostCommands.list,
-        }, this._session).catch((error: Error) => {
+        }, session).catch((error: Error) => {
             this.notify('error', `Failed to request port list: ${error.message}`, ENotificationType.error);
         });
     }
