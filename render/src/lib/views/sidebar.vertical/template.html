@@ -1,18 +1,17 @@
-<mat-expansion-panel
-    [disabled]="true"
-    [hideToggle]="true"
-    [expanded]="true">
-    <mat-expansion-panel-header>
-        <mat-panel-title>
-            Available ports
-        </mat-panel-title>
-    </mat-expansion-panel-header>
-    <ul class="ports" *ngIf="_ng_ports.length > 0">
-        <li *ngFor="let port of _ng_ports">
-            <button mat-raised-button>
-                <lib-dia-port-available-com [port]="port" [observables]="subjects">
-                </lib-dia-port-available-com>
-            </button>
-        </li>
-    </ul>    
+<mat-expansion-panel [disabled]="true" [hideToggle]="true" [expanded]="true">
+  <mat-expansion-panel-header>
+    <mat-panel-title> Available ports </mat-panel-title>
+  </mat-expansion-panel-header>
+  <ul class="ports" *ngIf="_ng_ports.length > 0 && !_ng_detectionError">
+    <li *ngFor="let port of _ng_ports; index as i; trackBy: _ng_trackBy">
+      <button [disableRipple]="true" mat-raised-button>
+        <lib-dia-port-available-com [port]="port" [observables]="subjects">
+        </lib-dia-port-available-com>
+      </button>
+    </li>
+  </ul>
+  <p *ngIf="_ng_ports.length === 0 && !_ng_detectionError">
+    No devices attached
+  </p>
+  <p *ngIf="_ng_detectionError">Failed to detect devices</p>
 </mat-expansion-panel>

@@ -1,37 +1,54 @@
 <div class="container">
-    <div class="info">
-        <div class="right">
-            <div *ngIf="_ng_isAvailable">
-                <mat-icon *ngIf="_ng_isConnected">power</mat-icon>
-                <mat-icon *ngIf="!_ng_isConnected">power_off</mat-icon>
-            </div>
-            <mat-icon *ngIf="!_ng_isAvailable">not_interested</mat-icon>
-            <p class="path">{{port.path}}</p>
-            <p *ngIf="_ng_isAvailable" class="size t-small color-scheme-2">{{_ng_read()}}</p>
-        </div>
-        <mat-icon (click)="_ng_isAvailable ? _ng_onOptions() : _ng_onWarning()">settings</mat-icon>
+  <div class="info">
+    <div class="right">
+      <div *ngIf="_ng_isAvailable">
+        <mat-icon *ngIf="_ng_isConnected">power</mat-icon>
+        <mat-icon *ngIf="!_ng_isConnected">power_off</mat-icon>
+      </div>
+      <mat-icon *ngIf="!_ng_isAvailable">not_interested</mat-icon>
+      <p class="path">{{port.path}}</p>
+      <p *ngIf="_ng_isAvailable" class="size t-small color-scheme-2">
+        {{_ng_read()}}
+      </p>
     </div>
-    <div *ngIf="_ng_isAvailable" class="canvas">
-        <div class="holder">
-            <canvas #canvas [attr.id]="'canvas_' + port.path"></canvas>
-        </div>
+    <mat-icon (click)="_ng_isAvailable ? _ng_onOptions() : _ng_onWarning()"
+      >settings</mat-icon
+    >
+  </div>
+  <div *ngIf="_ng_isAvailable" class="canvas">
+    <div class="holder">
+      <canvas #canvas [attr.id]="'canvas_' + port.path"></canvas>
     </div>
-    <div *ngIf="_ng_isConnected">
-        <mat-form-field class="recent-files outline regular" appearance="outline">
-            <input  matInput
-                    type="text" 
-                    placeholder="Type a command"
-                    (keyup.enter)="_ng_send($event)"
-                    aria-label="Filter"
-                    (focus)="_ng_loadCommands()"
-                    [matAutocomplete]="auto">
-            <mat-autocomplete #auto="matAutocomplete" class="regular"
-                [classList]="'recent-requests'"
-                [disableRipple]="true">
-                <mat-option *ngFor="let recent of _ng_recent" [value]="recent" [attr.title]="recent" class="recent-requests small t-small">
-                    {{recent}}
-                </mat-option>
-            </mat-autocomplete>
-        </mat-form-field>
-    </div>
+  </div>
+  <div *ngIf="_ng_isConnected">
+    <mat-form-field class="recent-files outline regular" appearance="outline">
+      <input
+        #commandInput
+        matInput
+        type="text"
+        placeholder="Type a command"
+        aria-label="Filter"
+        (focus)="_ng_loadCommands()"
+        (keyup)="_ng_onKeyup($event)"
+        (keydown)="_ng_onKeydown($event)"
+        [formControl]="_ng_inputCtrl"
+        [matAutocomplete]="auto"
+      />
+      <mat-autocomplete
+        #auto="matAutocomplete"
+        class="regular"
+        [classList]="'recent-requests'"
+        [disableRipple]="true"
+      >
+        <mat-option
+          *ngFor="let recent of _ng_recent"
+          [value]="recent"
+          [attr.title]="recent"
+          class="recent-requests small t-console t-small"
+        >
+          {{recent}}
+        </mat-option>
+      </mat-autocomplete>
+    </mat-form-field>
+  </div>
 </div>
