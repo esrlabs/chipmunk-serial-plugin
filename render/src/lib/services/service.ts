@@ -266,8 +266,17 @@ export class Service extends Toolkit.APluginService {
         this._session
       )
       .then(() => {
-        this.writeConfig(EType.options, options);
-
+        this.writeConfig(EType.options, options)
+          .then(() => {
+            if (this._configSettings !== undefined) {
+              this._configSettings[options.path] = options;
+            }
+          })
+          .catch((error: Error) => {
+            this._logger.error(
+              `Failed to update settings for port ${options.path} due to error: ${error.message}`
+            );
+          });
         const cSessionPort = this._sessionPort[this._session];
         if (cSessionPort !== undefined && cSessionPort[options.path]) {
           cSessionPort[options.path].connected = true;
@@ -317,6 +326,9 @@ export class Service extends Toolkit.APluginService {
   public requestPorts(session?: string): Promise<any> {
     if (session === undefined) {
       session = this._session;
+    }
+    if (session === "*") {
+      return new Promise((resolve) => resolve(true));
     }
     return this._api
       .getIPC()

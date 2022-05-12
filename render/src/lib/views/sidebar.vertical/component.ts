@@ -119,8 +119,13 @@ export class SidebarVerticalComponent implements AfterViewInit, OnDestroy {
   }
 
   private _updatePortsList() {
+    let empty_session: boolean;
     Service.requestPorts()
       .then((response) => {
+        if (response === true) {
+          empty_session = response;
+          return;
+        }
         this._ng_detectionError = false;
         this._updatePorts(response.ports);
       })
@@ -133,6 +138,9 @@ export class SidebarVerticalComponent implements AfterViewInit, OnDestroy {
         );
       })
       .finally(() => {
+        if (empty_session === true) {
+          return;
+        }
         setTimeout(() => {
           this._updatePortsList();
         }, 3500);
